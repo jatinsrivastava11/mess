@@ -15,6 +15,7 @@
 - **Capturing:** land on an enemy piece. You can't land on your own.
 - **Check:** you may never leave your own king under attack.
 - **Winning:** checkmate the opponent's king, or they resign.
+- **Clock:** each player has their own clock (3, 5 or 10 minutes). Only the player to move loses time. If your clock hits zero, you lose.
 - **Draws:** stalemate (no legal move but not in check), only the two kings left, or 50 moves each with no capture.
 
 ## The pieces
@@ -42,7 +43,9 @@ A piece is only allowed if it has at least one move from **every** square of the
 
 - [x] Game engine: piece pool, seeded random boards, legal moves, check, checkmate, stalemate, draws (with tests)
 - [x] Home popup with **Create Game** (copyable code) and **Join Game** (enter a code)
-- [x] Big centred board, match timer, rules (i) popup, menu with resign, light/dark toggle
+- [x] Chess clock for each player (3, 5 or 10 minutes, picked when creating a game). Running out of time loses.
+- [x] Big centred board, rules (i) popup, menu with resign, light/dark toggle
+- [x] Phone layout: board fills the width, clocks sit above and below it
 - [ ] Email + password accounts (Supabase Auth)
 - [ ] Real online play: create/join by code, moves synced live (Supabase Realtime)
 - [ ] Profile: wins and achievements
@@ -76,8 +79,9 @@ src/
   lib/game/
     pieces.ts          which pieces exist and how they move
     engine.ts          rules: setup, legal moves, check/mate/stalemate/draws
+    clock.ts           chess clock (pure functions, tested)
     rng.ts             seeded random numbers
-    engine.test.ts     tests for all of the above
+    *.test.ts          tests
 ```
 
 See [NOTES.md](NOTES.md) for the concepts behind the code and what to learn next.

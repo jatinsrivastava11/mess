@@ -1,21 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Color, type GameState, makeMove, newGame, resign } from "@/lib/game/engine";
+import {
+  type Clock,
+  TIME_CONTROLS_MIN,
+  type TimeControl,
+  flagged,
+  pressClock,
+  startClock,
+  stopClock,
+  timeLeft,
+} from "@/lib/game/clock";
+import { type Color, type GameState, makeMove, newGame, resign, timeout } from "@/lib/game/engine";
 import { randomSeed } from "@/lib/game/rng";
 import { Board } from "./Board";
 import { Logo } from "./Logo";
 import { Button, Modal } from "./Modal";
 import { Rules } from "./Rules";
 
-// For now a game code is just the board's seed in base 36, and games are played
-// on one device. When online play lands, codes will point at a game stored in Supabase.
-const toCode = (seed: number) => seed.toString(36).toUpperCase().padStart(7, "0");
-function fromCode(code: string): number | null {
+// For now a game code is the board's seed in base 36 plus one digit for the time
+// control, and games are played on one device. When online play lands, codes
+// will point at a game stored in Supabase.
+const toCode = (seed: number, minutes: TimeControl) =>
+  seed.toString(36).toUpperCase().padStart(7, "0") + TIME_CONTROLS_MIN.indexOf(minutes);
+function fromCode(code: string): { seed: number; minutes: TimeControl } | null {
   const clean = code.trim().toUpperCase();
-  if (!/^[0-9A-Z]{1,7}$/.test(clean)) return null;
-  const seed = parseInt(clean, 36);
-  return seed < 2 ** 32 ? seed : null;
+  if (!/^[0-9A-Z]{7}[0-9]$/.test(clean)) return null;
+  const seed = parseInt(clean.slice(0, 7), 36);
+  const minutes = TIME_CONTROLS_MIN[Number(clean[7])];
+  return seed < 2 ** 32 && minutes ? { seed, minutes } : null;
 }
 
 type Popup = null | "info" | "menu" | "profile" | "account" | "settings";
@@ -32,23 +45,42 @@ export function MessApp() {
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [startedAt, setStartedAt] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const [minutes, setMinutes] = useState<TimeControl>(10);
+  const [clock, setClock] = useState<Clock>(() => startClock(10, 0));
+  const [now, setNow] = useState(0);
 
   const over = game.status.kind !== "playing";
 
+  // Tick the display and check for a flag while a clock is running.
   useEffect(() => {
-    if (!playing || over) return;
-    const id = setInterval(() => setElapsed(Date.now() - startedAt), 250);
+    if (!playing || !clock.running) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      const loser = flagged(clock, t);
+      if (loser) {
+        setGame((g) => timeout(g, loser));
+        setClock((c) => stopClock(c, t));
+      }
+    }, 100);
     return () => clearInterval(id);
-  }, [playing, over, startedAt]);
+  }, [playing, clock]);
 
-  function start(seed: number) {
+  function start(seed: number, mins: TimeControl) {
+    const t = Date.now();
     setGame(newGame(seed));
+    setClock(startClock(mins, t));
+    setNow(t);
     setPlaying(true);
-    setStartedAt(Date.now());
-    setElapsed(0);
     setPopup(null);
+  }
+
+  function move(from: number, to: number) {
+    const t = Date.now();
+    const next = makeMove(game, from, to);
+    setGame(next);
+    setClock((c) => (next.status.kind === "playing" ? pressClock(c, t) : stopClock(c, t)));
+    setNow(t);
   }
 
   function goHome() {
@@ -66,13 +98,14 @@ export function MessApp() {
   }
 
   function join() {
-    const seed = fromCode(joinCode);
-    if (seed === null) return setJoinError("That doesn't look like a game code.");
-    start(seed);
+    const parsed = fromCode(joinCode);
+    if (!parsed) return setJoinError("That doesn't look like a game code.");
+    start(parsed.seed, parsed.minutes);
   }
 
   function doResign() {
     setGame((g) => resign(g, g.turn));
+    setClock((c) => stopClock(c, Date.now()));
     goHome();
   }
 
@@ -80,18 +113,18 @@ export function MessApp() {
     <main className="relative flex h-dvh w-full items-center justify-center">
       {/* Top centre: spotlighted title */}
       <header className="spotlight pointer-events-none absolute inset-x-0 top-0 flex h-28 justify-center pt-3">
-        <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8" />
-          <h1 className="font-math text-3xl font-bold tracking-tight">mess</h1>
+        <div className="flex h-9 items-center gap-2 sm:h-10">
+          <Logo className="h-6 w-6 sm:h-8 sm:w-8" />
+          <h1 className="font-math text-2xl font-bold tracking-tight sm:text-3xl">mess</h1>
         </div>
       </header>
 
-      {/* Top left: match timer while playing, otherwise profile / account / settings */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+      {/* Top left: chess clocks while playing (above the board on phones), otherwise profile / account / settings */}
+      <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 sm:top-4 sm:left-4 sm:gap-2">
         {playing ? (
-          <div className="rounded-xl border border-panel-border bg-panel px-3 py-2 font-mono text-sm tabular-nums shadow-sm">
-            <span className="mr-2">{formatTime(elapsed)}</span>
-            <span className="text-muted">{over ? "game over" : `${colorName(game.turn)} to move`}</span>
+          <div className="hidden flex-col gap-1.5 sm:flex">
+            <ClockFace color="b" clock={clock} now={now} />
+            <ClockFace color="w" clock={clock} now={now} />
           </div>
         ) : (
           <>
@@ -112,7 +145,7 @@ export function MessApp() {
       </div>
 
       {/* Top right: menu and rules */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <div className="absolute top-3 right-3 z-10 flex gap-1.5 sm:top-4 sm:right-4 sm:gap-2">
         <IconButton label="Rules" onClick={() => setPopup("info")}>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 11v6M12 7.5v.5" />
@@ -123,8 +156,19 @@ export function MessApp() {
       </div>
 
       {/* Centre: the board */}
-      <div className="mt-10">
-        <Board game={game} onMove={(f, t) => setGame((g) => makeMove(g, f, t))} interactive={playing && !over} />
+      <div className="mt-10 flex flex-col items-center gap-3">
+        {/* On phones each clock sits next to its own side of the board. */}
+        {playing && (
+          <div className="self-start sm:hidden">
+            <ClockFace color="b" clock={clock} now={now} />
+          </div>
+        )}
+        <Board game={game} onMove={move} interactive={playing && !over} />
+        {playing && (
+          <div className="self-end sm:hidden">
+            <ClockFace color="w" clock={clock} now={now} />
+          </div>
+        )}
       </div>
 
       {/* Bottom left: subtle site name */}
@@ -151,22 +195,44 @@ export function MessApp() {
           )}
           {home === "create" && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Your game code</h2>
+              <h2 className="text-xl font-semibold">New game</h2>
+              <div>
+                <p className="mb-2 text-sm text-muted">Time for each player</p>
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Time control">
+                  {TIME_CONTROLS_MIN.map((m) => (
+                    <button
+                      key={m}
+                      role="radio"
+                      aria-checked={minutes === m}
+                      onClick={() => {
+                        setMinutes(m);
+                        setCopied(false);
+                      }}
+                      className={`rounded-xl border py-2 font-medium transition ${
+                        minutes === m ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
+                      }`}
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-sm text-muted">Your game code</p>
               <button
                 onClick={() => {
-                  navigator.clipboard?.writeText(toCode(pendingSeed)).then(() => setCopied(true), () => {});
+                  navigator.clipboard?.writeText(toCode(pendingSeed, minutes)).then(() => setCopied(true), () => {});
                 }}
                 className="w-full rounded-xl border border-dashed border-panel-border py-4 font-mono text-3xl tracking-[0.25em] hover:bg-fg/5"
                 title="Copy code"
               >
-                {toCode(pendingSeed)}
+                {toCode(pendingSeed, minutes)}
               </button>
               <p className="text-center text-xs text-muted">{copied ? "Copied!" : "Click the code to copy it."}</p>
               <p className="text-xs text-muted">
                 Online play is coming soon. For now, the same code always makes the same board, so you can play it here
                 on one device.
               </p>
-              <Button onClick={() => start(pendingSeed)}>Start on this device</Button>
+              <Button onClick={() => start(pendingSeed, minutes)}>Start on this device</Button>
               <Button variant="ghost" onClick={() => setHome("choose")}>
                 Back
               </Button>
@@ -189,7 +255,7 @@ export function MessApp() {
                   setJoinError("");
                 }}
                 placeholder="ENTER CODE"
-                maxLength={7}
+                maxLength={8}
                 className="w-full rounded-xl border border-panel-border bg-transparent px-4 py-3 text-center font-mono text-2xl tracking-[0.25em] outline-none focus:border-accent"
               />
               {joinError && <p className="text-sm text-red-500">{joinError}</p>}
@@ -242,7 +308,7 @@ export function MessApp() {
       {playing && over && popup === null && (
         <Modal title={resultTitle(game)}>
           <p className="mb-4 text-sm text-muted">
-            {resultDetail(game)} in {formatTime(elapsed)} after {game.history.length} moves.
+            {resultDetail(game)} after {game.history.length} moves.
           </p>
           <div className="space-y-2">
             <Button onClick={goHome}>Back to home</Button>
@@ -258,7 +324,7 @@ export function MessApp() {
 
 function resultTitle(g: GameState) {
   const s = g.status;
-  if (s.kind === "checkmate" || s.kind === "resigned") return `${colorName(s.winner)} wins`;
+  if (s.kind === "checkmate" || s.kind === "resigned" || s.kind === "timeout") return `${colorName(s.winner)} wins`;
   return "Draw";
 }
 
@@ -269,6 +335,8 @@ function resultDetail(g: GameState) {
       return "Checkmate";
     case "resigned":
       return "Resignation";
+    case "timeout":
+      return `${colorName(s.winner === "w" ? "b" : "w")} ran out of time`;
     case "stalemate":
       return "Stalemate";
     case "draw":
@@ -278,9 +346,34 @@ function resultDetail(g: GameState) {
   }
 }
 
-function formatTime(ms: number) {
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+/** mm:ss, switching to ss.t in the last 20 seconds. */
+function formatClock(ms: number) {
+  if (ms < 20_000) return (Math.floor(ms / 100) / 10).toFixed(1);
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function ClockFace({ color, clock, now }: { color: Color; clock: Clock; now: number }) {
+  const ms = timeLeft(clock, color, now);
+  const active = clock.running === color;
+  const low = ms < 20_000;
+  return (
+    <div
+      className={`flex min-w-32 items-center justify-between gap-3 rounded-xl border px-3 py-1.5 shadow-sm transition ${
+        active ? "border-fg bg-fg text-bg" : "border-panel-border bg-panel text-muted"
+      }`}
+      aria-label={`${colorName(color)} clock`}
+    >
+      <span className="flex items-center gap-1.5 text-xs font-medium">
+        <span
+          className="h-2.5 w-2.5 rounded-full ring-1 ring-current"
+          style={{ background: color === "w" ? "var(--piece-w-bg)" : "var(--piece-b-bg)" }}
+        />
+        {colorName(color)}
+      </span>
+      <span className={`font-mono text-lg tabular-nums ${low && active ? "text-red-500" : ""}`}>{formatClock(ms)}</span>
+    </div>
+  );
 }
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
@@ -289,7 +382,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex h-10 w-10 items-center justify-center rounded-xl border border-panel-border bg-panel shadow-sm transition hover:scale-105"
+      className="flex h-9 w-9 items-center justify-center rounded-xl border sm:h-10 sm:w-10 border-panel-border bg-panel shadow-sm transition hover:scale-105"
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
         {children}

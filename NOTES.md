@@ -38,6 +38,7 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Legal vs pseudo-legal moves:** a move is legal only if, after playing it, your king isn't attacked. The engine *simulates* each move and checks. That's simple, but not the fastest way.
 - **Reverse attack lookup:** `isAttacked()` looks *outward from the target square* using each piece type's vectors, because moves are symmetric.
 - **Seeded pseudo-random numbers:** `rng.ts` (mulberry32). The same seed gives the same board, so two players can share one number instead of a whole board.
+- **Clocks without drift:** `clock.ts` never counts down with a timer. It stores *time left when the turn began* plus *when it began*, and computes `left = remaining − (now − since)`. `setInterval` only redraws the screen. Timers in browsers are unreliable (background tabs slow them down), but subtracting timestamps is always right. The same idea will keep two devices' clocks in sync online.
 - **Game trees (for Phase 2, the bot):** minimax, alpha–beta pruning, evaluation functions. See the Chess Programming Wiki.
 - **Graph theory:** each piece's moves form a graph on 64 squares. Knight's tours are Hamiltonian paths on the √5 graph.
 
@@ -76,7 +77,7 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Tailwind CSS:** utility classes like `flex`, `rounded-xl`, `dark:hidden`.
 - **CSS custom properties (variables):** all colours live in `globals.css` under `:root` and `.dark`. Dark mode just swaps the variables.
 - **CSS Grid:** the board is `grid-cols-8 grid-rows-8`. Without `grid-rows-8`, rows grew to fit their content and weren't square (a real bug found while building).
-- **Responsive sizing:** `w-[min(76vh,94vw)]` makes the board as big as fits.
+- **Responsive sizing:** `w-[min(76vh,94vw)]` makes the board as big as fits. `sm:` prefixes switch layout at 640px wide. On phones the clocks move from the top-left corner to above and below the board.
 - **Accessibility:** `aria-label`s on icon buttons and squares, `role="dialog"`, and closing popups with Escape.
 - **Avoiding a theme flash:** a tiny inline script in `layout.tsx` sets dark mode *before* React loads.
 

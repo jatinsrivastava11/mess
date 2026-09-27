@@ -26,6 +26,7 @@ export type Status =
   | { kind: "playing" }
   | { kind: "checkmate"; winner: Color }
   | { kind: "resigned"; winner: Color }
+  | { kind: "timeout"; winner: Color }
   | { kind: "stalemate" }
   | { kind: "draw"; reason: "only-kings" | "no-captures" };
 
@@ -172,6 +173,11 @@ export function makeMove(state: GameState, from: number, to: number): GameState 
 export function resign(state: GameState, color: Color): GameState {
   if (state.status.kind !== "playing") return state;
   return { ...state, status: { kind: "resigned", winner: other(color) } };
+}
+
+export function timeout(state: GameState, loser: Color): GameState {
+  if (state.status.kind !== "playing") return state;
+  return { ...state, status: { kind: "timeout", winner: other(loser) } };
 }
 
 /** Algebraic-style name for a square, e.g. 56 → "a1". */
