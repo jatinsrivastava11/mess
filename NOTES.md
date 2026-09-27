@@ -7,17 +7,17 @@ A study guide for the concepts, languages and tools inside mess, roughly in the 
 ## 1. The maths
 
 ### Sums of two squares
-A piece √n exists only if n = a² + b² for whole numbers a, b. Which numbers can be written this way?
+A piece √n exists only if n = a² + b² for whole numbers a, b ≥ 1. Which numbers can be written this way?
 **Fermat's theorem on sums of two squares:** n is a sum of two squares exactly when every prime ≡ 3 (mod 4) in its factorisation appears an even number of times. That's why √3, √6, √7, √11, √12 ... never show up. 3 is a prime ≡ 3 (mod 4) appearing once.
 - Where: `computePool()` in `src/lib/game/pieces.ts` brute-forces it instead of using the theorem. Try proving they agree.
-- Learn: modular arithmetic, Gaussian integers (a + bi), and why 25 = 3² + 4² = 0² + 5² has two representations.
+- Learn: modular arithmetic, Gaussian integers (a + bi), and why 50 = 1² + 7² = 5² + 5² has two representations.
 
 ### Symmetry and vectors
-Each leg pair (a, b) becomes up to 8 jump vectors: (±a, ±b) and (±b, ±a). That's the symmetry group of the square (the **dihedral group D4**).
-- Where: `vectorsFromLegs()`.
+Each side pair (a, b) with a ≠ b becomes 8 jump vectors: (±a, ±b) and (±b, ±a). That's the symmetry group of the square (the **dihedral group D4**). Equal sides (a, a) use a house rule instead: 4 straight jumps (±a, 0) and (0, ±a).
+- Where: `movesFromLegs()`.
 
 ### Parity / colour-binding
-A jump (a, b) changes square colour only when a + b is odd. So √2, 2, √8, √10, 4, √18, √20 and √32 stay on one colour forever, like bishops. Only √5, 3, √13, √17 and 5 can switch. Some are even more trapped: 2 = (0, 2) only ever changes each coordinate by an even amount, so it can reach just a quarter of the board. Can you work out exactly which squares each piece can reach? (Hint: graph connectivity, section 3.)
+A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 straight), √10 (1, 3), √20 (2, 4) and √32 (4 straight) stay on one colour forever, like bishops. √2, √5, √13, √17, √18 and 5 can switch. √8 and √32 are even more trapped: they change each coordinate by an even amount, so they only reach a quarter of the board. Can you work out exactly which squares each piece can reach? (Hint: graph connectivity, section 3.)
 
 ---
 

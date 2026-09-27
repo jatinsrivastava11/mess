@@ -8,7 +8,9 @@
 
 - **Board:** a standard 8×8 board.
 - **Setup:** each player gets their king and **7 random pieces** on their back row. The two sides are drawn *independently*, so no two games (or armies) are alike.
-- **Movement:** a piece √n can **jump** to any square (dx, dy) where dx² + dy² = n. Pieces in between never block it. If n can be written as a sum of two squares in more than one way, the piece gets all of them. For example, **5** (= √25) jumps (3, 4) *or* (0, 5).
+- **Movement:** a piece √n is the hypotenuse of a right triangle with whole-number sides a, b ≥ 1 (a² + b² = n). It **jumps** like a knight: a squares one way, b the other. Pieces in between never block it.
+- **Equal sides move straight:** when a = b (√2, √8, √18, √32), the piece jumps a squares in a straight line (up, down, left or right). √2 steps 1, √8 jumps 2, and so on.
+- If n can be split into two squares in more than one way, the piece gets every split. This only happens on bigger boards: √50 = 1² + 7² = 5² + 5².
 - **The king** is **1** (drawn with a crown). It steps one square in any direction, like a chess king.
 - **Capturing:** land on an enemy piece. You can't land on your own.
 - **Check:** you may never leave your own king under attack.
@@ -17,19 +19,24 @@
 
 ## The pieces
 
-A piece is only allowed if it has at least one move from **every** square of the board. On 8×8 that means each leg of the triangle is at most 4. A leg of 5 or more gets stuck on the centre squares. Perfect squares are written as whole numbers.
+A piece is only allowed if it has at least one move from **every** square of the board. On 8×8 that means each side of the triangle is at most 4. A side of 5 or more gets stuck on the centre squares. Sides must be at least 1: 2 = √(0² + 2²) is a flat line, not a triangle, so it isn't a piece. Perfect squares are written as whole numbers.
 
-| Piece | Jumps (dx, dy) | | Piece | Jumps (dx, dy) |
-|---|---|---|---|---|
-| **1** (king) | one step, any direction | | **√13** | (2, 3) |
-| **√2** | (1, 1) | | **4** = √16 | (0, 4) |
-| **2** = √4 | (0, 2) | | **√17** | (1, 4) |
-| **√5** | (1, 2), the knight | | **√18** | (3, 3) |
-| **√8** | (2, 2) | | **√20** | (2, 4) |
-| **3** = √9 | (0, 3) | | **5** = √25 | (3, 4) or (0, 5) |
-| **√10** | (1, 3) | | **√32** | (4, 4) |
+| Piece | Sides | Moves | | Piece | Sides | Moves |
+|---|---|---|---|---|---|---|
+| **1** (king) | n/a | one step, any direction | | **√17** | 1, 4 | knight-style (1, 4) |
+| **√2** | 1, 1 | 1 straight | | **√18** | 3, 3 | 3 straight |
+| **√5** | 1, 2 | knight-style (1, 2), the knight | | **√20** | 2, 4 | knight-style (2, 4) |
+| **√8** | 2, 2 | 2 straight | | **5** = √25 | 3, 4 | knight-style (3, 4) |
+| **√10** | 1, 3 | knight-style (1, 3) | | **√32** | 4, 4 | 4 straight |
+| **√13** | 2, 3 | knight-style (2, 3) | | | | |
 
-√3, √6, √7, ... never appear: they can't be written as a sum of two squares. The pool isn't typed in by hand. [`computePool()`](src/lib/game/pieces.ts) derives it from the rules, so it would adapt to any board size.
+√3, √6, √7, ... never appear: they can't be written as a sum of two squares. The pool isn't typed in by hand. [`computePool()`](src/lib/game/pieces.ts) derives it from the rules, so it adapts to any board size:
+
+| Board | 6×6 | **8×8** | 10×10 | 12×12 | 14×14 | 16×16 |
+|---|---|---|---|---|---|---|
+| Pieces | 6 | **10** | 15 | 21 | 27 | 34 |
+
+(An odd size gives the same pool as the even size just below it, because the centre square is the limit.)
 
 ## Features
 

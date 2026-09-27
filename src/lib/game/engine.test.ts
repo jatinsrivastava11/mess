@@ -22,15 +22,21 @@ function position(pieces: Record<string, string>, turn: "w" | "b" = "w"): GameSt
 }
 
 describe("piece pool", () => {
-  it("contains exactly the pieces that can move from every square", () => {
-    expect(POOL.map((p) => p.label)).toEqual([
-      "√2", "2", "√5", "√8", "3", "√10", "√13", "4", "√17", "√18", "√20", "5", "√32",
-    ]);
+  it("contains exactly the true-triangle pieces that can move from every square", () => {
+    expect(POOL.map((p) => p.label)).toEqual(["√2", "√5", "√8", "√10", "√13", "√17", "√18", "√20", "5", "√32"]);
   });
 
-  it("gives 5 = √25 every way of writing 25 as a sum of two squares", () => {
-    expect(pieceDef(25).legs).toEqual([[0, 5], [3, 4]]);
-    expect(pieceDef(25).vectors).toHaveLength(12);
+  it("drops zero-length legs: 5 = √25 keeps (3,4) but not (0,5), and there is no 2, 3 or 4", () => {
+    expect(pieceDef(25).legs).toEqual([[3, 4]]);
+    expect(pieceDef(25).vectors).toHaveLength(8);
+    const ns = POOL.map((p) => p.n);
+    for (const n of [4, 9, 16]) expect(ns).not.toContain(n);
+  });
+
+  it("moves equal-leg pieces in straight lines", () => {
+    const sorted = (n: number) => [...pieceDef(n).vectors].map(String).sort();
+    expect(sorted(2)).toEqual(["-1,0", "0,-1", "0,1", "1,0"]);
+    expect(sorted(18)).toEqual(["-3,0", "0,-3", "0,3", "3,0"]);
   });
 
   it("excludes √3 (not a sum of two squares) and pieces with a leg over 4", () => {
@@ -43,6 +49,7 @@ describe("piece pool", () => {
   it("scales with board size", () => {
     // On 3×3 only √2 can move from the centre square.
     expect(computePool(3).map((p) => p.n)).toEqual([2]);
+    expect(computePool(12).length).toBeGreaterThan(2 * POOL.length);
   });
 });
 
@@ -75,23 +82,28 @@ describe("moves", () => {
     );
   });
 
+  it("√2 steps one square in a straight line, not diagonally", () => {
+    const g = position({ d4: "w2", a1: "w1", h8: "b1" });
+    expect(legalTargets(g, sq("d4")).map(squareName).sort()).toEqual(["c4", "d3", "d5", "e4"]);
+  });
+
   it("the king steps one square in any direction", () => {
     const g = position({ d4: "w1", h8: "b1" });
     expect(legalTargets(g, sq("d4"))).toHaveLength(8);
   });
 
   it("cannot capture your own pieces or move into check", () => {
-    // Black 2 on d6 attacks d4, d8, b6, f6.
-    const g = position({ d3: "w1", e4: "w2", d6: "b4", h8: "b1" });
+    // Black √8 on d6 attacks d4, d8, b6, f6.
+    const g = position({ d3: "w1", e4: "w2", d6: "b8", h8: "b1" });
     const kingMoves = legalTargets(g, sq("d3")).map(squareName);
     expect(kingMoves).not.toContain("e4");
     expect(kingMoves).not.toContain("d4");
   });
 
   it("ends the game on checkmate", () => {
-    // Codes are color + n, so "w4" is White's 2 (√4), which jumps 2 squares in a straight line.
+    // Codes are color + n, so "w8" is White's 2 (√4), which jumps 2 squares in a straight line.
     // The 2 on a4 jumps to a6 and checks a8; c7, d7 and d8 cover a7, b7 and b8.
-    const g = position({ a8: "b1", a4: "w4", c7: "w4", d7: "w4", d8: "w4", h1: "w1" });
+    const g = position({ a8: "b1", a4: "w8", c7: "w8", d7: "w8", d8: "w8", h1: "w1" });
     const after = makeMove(g, sq("a4"), sq("a6"));
     expect(inCheck(after.board, "b")).toBe(true);
     expect(after.status).toEqual({ kind: "checkmate", winner: "w" });
@@ -99,7 +111,7 @@ describe("moves", () => {
 
   it("detects stalemate", () => {
     // Black king on a8 is not attacked, but a7 (from a5), b7 (from b5) and b8 (from d8) are.
-    const g = position({ a8: "b1", a5: "w4", b5: "w4", d8: "w4", h1: "w1" });
+    const g = position({ a8: "b1", a5: "w8", b5: "w8", d8: "w8", h1: "w1" });
     const after = makeMove(g, sq("h1"), sq("h2"));
     expect(inCheck(after.board, "b")).toBe(false);
     expect(after.status).toEqual({ kind: "stalemate" });

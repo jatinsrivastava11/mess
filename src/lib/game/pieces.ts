@@ -1,13 +1,20 @@
 // The piece pool for mess.
 //
-// A piece is a number √n. It jumps to any square (dx, dy) with dx² + dy² = n,
-// i.e. n is the squared hypotenuse and |dx|, |dy| are the triangle's legs.
-// If n can be split into two squares in more than one way (25 = 3²+4² = 0²+5²),
+// A piece is a number √n, the hypotenuse of a right triangle with whole-number
+// legs a, b ≥ 1 (a² + b² = n). A zero-length leg isn't a triangle, so 0² + 2²
+// doesn't count and there is no piece "2".
+//
+// Movement:
+//  - unequal legs (a ≠ b) jump like a knight: a one way, b the other
+//    (√5 = 1,2 is exactly the knight);
+//  - equal legs (a = a) jump a squares in a straight line: up, down, left or
+//    right (√2 steps 1, √8 jumps 2, ...).
+// If n splits into legs in more than one way (√50 = 1,7 or 5,5 on big boards),
 // the piece gets every split. A piece is only allowed in the game if it has at
 // least one move from EVERY square of an empty board.
 //
-// The king is "1" (√1). It is special: it steps one square in any of the
-// 8 directions, like a chess king, instead of only orthogonally.
+// The king is "1". It isn't a triangle, so it gets its own rule: one step in
+// any of the 8 directions, like a chess king.
 
 export const BOARD_SIZE = 8;
 export const KING = 1;
@@ -19,7 +26,7 @@ export interface PieceDef {
   n: number;
   /** How it's written on the piece: "√5", or "2" for √4. */
   label: string;
-  /** Distinct leg pairs [a, b] with a ≤ b and a² + b² = n. */
+  /** Distinct leg pairs [a, b] with 1 ≤ a ≤ b and a² + b² = n. */
   legs: [number, number][];
   /** Every jump vector the piece can make. */
   vectors: Vec[];
@@ -30,15 +37,16 @@ export function labelFor(n: number): string {
   return r * r === n ? String(r) : `√${n}`;
 }
 
-/** All (dx, dy) sign/swap variants of each leg pair, without duplicates. */
-function vectorsFromLegs(legs: [number, number][]): Vec[] {
+/** Jump vectors for a set of legs: knight-style for a ≠ b, straight lines for a = b. */
+export function movesFromLegs(legs: [number, number][]): Vec[] {
   const seen = new Set<string>();
   const out: Vec[] = [];
   for (const [a, b] of legs) {
-    for (const [p, q] of [[a, b], [b, a]]) {
+    const shapes = a === b ? [[a, 0], [0, a]] : [[a, b], [b, a]];
+    for (const [p, q] of shapes) {
       for (const sp of [1, -1]) {
         for (const sq of [1, -1]) {
-          const v: Vec = [p * sp, q * sq];
+          const v: Vec = [p * sp || 0, q * sq || 0]; // `|| 0` turns -0 into 0
           const key = `${v[0]},${v[1]}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -69,9 +77,8 @@ function movableEverywhere(vectors: Vec[], size: number): boolean {
 export function computePool(size = BOARD_SIZE): PieceDef[] {
   const maxLeg = size - 1;
   const legsByN = new Map<number, [number, number][]>();
-  for (let a = 0; a <= maxLeg; a++) {
+  for (let a = 1; a <= maxLeg; a++) {
     for (let b = a; b <= maxLeg; b++) {
-      if (a === 0 && b === 0) continue;
       const n = a * a + b * b;
       if (!legsByN.has(n)) legsByN.set(n, []);
       legsByN.get(n)!.push([a, b]);
@@ -80,8 +87,7 @@ export function computePool(size = BOARD_SIZE): PieceDef[] {
 
   const pool: PieceDef[] = [];
   for (const [n, legs] of [...legsByN].sort((x, y) => x[0] - y[0])) {
-    if (n === KING) continue;
-    const vectors = vectorsFromLegs(legs);
+    const vectors = movesFromLegs(legs);
     if (movableEverywhere(vectors, size)) {
       pool.push({ n, label: labelFor(n), legs, vectors });
     }
@@ -91,12 +97,13 @@ export function computePool(size = BOARD_SIZE): PieceDef[] {
 
 export const POOL: PieceDef[] = computePool();
 
-export const KING_DEF: PieceDef = {
-  n: KING,
-  label: "1",
-  legs: [[0, 1], [1, 1]],
-  vectors: vectorsFromLegs([[0, 1], [1, 1]]),
-};
+const KING_STEPS: Vec[] = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1],
+];
+
+export const KING_DEF: PieceDef = { n: KING, label: "1", legs: [], vectors: KING_STEPS };
 
 const DEFS = new Map<number, PieceDef>([[KING, KING_DEF], ...POOL.map((d) => [d.n, d] as const)]);
 

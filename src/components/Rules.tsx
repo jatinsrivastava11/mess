@@ -26,7 +26,7 @@ function MoveDiagram({ def }: { def: PieceDef }) {
 }
 
 function legsText(def: PieceDef) {
-  return def.legs.map(([a, b]) => `${a}² + ${b}²`).join(" or ");
+  return def.legs.map(([a, b]) => `${a}² + ${b}²${a === b ? " straight" : ""}`).join(" or ");
 }
 
 export function Rules() {
@@ -35,9 +35,11 @@ export function Rules() {
       <section>
         <h3 className="mb-1 font-semibold">The idea</h3>
         <p>
-          Every piece is a square root. It jumps to any square that forms a right triangle with it as the
-          <em> hypotenuse</em>. <b>√5</b> jumps 1 one way and 2 the other (1² + 2² = 5), exactly like a knight.
-          Perfect squares are written as whole numbers: <b>5</b> is √25 and can jump (3, 4) <em>or</em> (0, 5).
+          Every piece is a square root: the <em>hypotenuse</em> of a right triangle whose two sides are whole numbers
+          (at least 1). It jumps like a knight, one side&apos;s length one way and the other side&apos;s the other way.{" "}
+          <b>√5</b> jumps 1 and 2 (1² + 2² = 5), exactly the knight. If both sides are equal, the piece jumps that
+          many squares in a <b>straight line</b> instead: <b>√2</b> steps 1 up, down, left or right, and <b>√8</b> jumps 2.
+          Perfect squares are written as whole numbers, so <b>5</b> is √25 (3² + 4²).
         </p>
       </section>
       <section>
@@ -59,8 +61,9 @@ export function Rules() {
       <section>
         <h3 className="mb-2 font-semibold">The pieces</h3>
         <p className="mb-3 text-muted">
-          Only pieces that can move from <em>every</em> square of the board are allowed, so each leg must be at most 4.
-          That leaves these {POOL.length} pieces plus the king.
+          Only pieces that can move from <em>every</em> square of the board are allowed, so each side must be at most 4.
+          That leaves these {POOL.length} pieces plus the king. √3 can&apos;t exist, and 2 = √(0² + 2²) doesn&apos;t count
+          because a side of 0 isn&apos;t a triangle.
         </p>
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {[KING_DEF, ...POOL].map((def) => (
