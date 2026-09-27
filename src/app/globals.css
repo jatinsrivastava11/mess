@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f1ea;
+  --bg-glow: #ffffff;
+  --fg: #1d2129;
+  --muted: #6b7280;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-border: rgba(29, 33, 41, 0.12);
+  --accent: #c2410c;
+  --sq-light: #ece6d6;
+  --sq-dark: #7d8ba1;
+  --sq-frame: #3b4556;
+  --hint: rgba(29, 33, 41, 0.28);
+  --select: rgba(234, 179, 8, 0.55);
+  --last: rgba(234, 179, 8, 0.28);
+  --check: rgba(220, 38, 38, 0.6);
+  --piece-w-bg: #fffdf7;
+  --piece-w-fg: #1d2129;
+  --piece-b-bg: #1d2129;
+  --piece-b-fg: #f4f1ea;
+}
+
+.dark {
+  --bg: #0f1216;
+  --bg-glow: #1b212b;
+  --fg: #e8e6e1;
+  --muted: #9aa3b2;
+  --panel: rgba(24, 28, 36, 0.86);
+  --panel-border: rgba(232, 230, 225, 0.12);
+  --accent: #fb923c;
+  --sq-light: #4a5366;
+  --sq-dark: #2a303c;
+  --sq-frame: #0a0c10;
+  --hint: rgba(232, 230, 225, 0.3);
+  --piece-w-bg: #f4f1ea;
+  --piece-w-fg: #151920;
+  --piece-b-bg: #0b0d11;
+  --piece-b-fg: #f4f1ea;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-panel: var(--panel);
+  --color-panel-border: var(--panel-border);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-math: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(ellipse at 50% 30%, var(--bg-glow), var(--bg) 70%);
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Spotlight behind the title at the top centre. */
+.spotlight {
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+}
+
+.radical-bar {
+  border-top: 0.08em solid currentColor;
+  padding-left: 0.04em;
+  margin-left: -0.02em;
 }
