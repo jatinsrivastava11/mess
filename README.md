@@ -42,45 +42,61 @@ A piece is only allowed if it has at least one move from **every** square of the
 ## Features
 
 - [x] Game engine: piece pool, seeded random boards, legal moves, check, checkmate, stalemate, draws (with tests)
-- [x] Home popup with **Create Game** (copyable code) and **Join Game** (enter a code)
+- [x] **Online play across devices:** Create Game gives a 6-letter code, and the opponent joins with it on any device. Moves and clocks sync live.
+- [x] Every move is checked on the server. Players can't write to the database directly, so a modified browser can't cheat.
+- [x] Pass-and-play on one device
 - [x] Chess clock for each player (3, 5 or 10 minutes, picked when creating a game). Running out of time loses.
 - [x] Big centred board, rules (i) popup, menu with resign, light/dark toggle
 - [x] Phone layout: board fills the width, clocks sit above and below it
-- [ ] Email + password accounts (Supabase Auth)
-- [ ] Real online play: create/join by code, moves synced live (Supabase Realtime)
+- [ ] Email + password accounts (Firebase Auth), with email verification and bot protection
 - [ ] Profile: wins and achievements
 - [ ] Settings
 - [ ] **Phase 2:** play against a bot
 
-Right now Create/Join works **on one device**. The code is the board's seed, so the same code always rebuilds the same board.
+Online players are anonymous for now. Each browser gets an invisible identity, and email accounts will attach to it later.
 
 ## Tech
 
 - [Next.js](https://nextjs.org) (App Router) + React + TypeScript
 - Tailwind CSS
 - [Vitest](https://vitest.dev) for engine tests
-- Planned: [Supabase](https://supabase.com) (free tier) for auth, Postgres and realtime, deployed on [Vercel](https://vercel.com)
+- [Firebase](https://firebase.google.com) (free Spark plan): Authentication plus Cloud Firestore for live game updates
+- Next.js API routes (on [Vercel](https://vercel.com), free Hobby plan) validate every move with the Firebase Admin SDK
 
 ## Run it locally
 
+Needs Node 20+ and, for online play, Java 21+ (the Firebase emulators run on it).
+
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm test        # engine tests
-npm run build   # production build
+cp .env.example .env.local   # emulator settings, no real Firebase needed
+npm run dev:online           # app + local Firebase emulators → http://localhost:3000
+npm run dev                  # app only (pass-and-play works, online needs the emulators)
+npm test                     # engine, clock and online-rules tests
+npm run build                # production build
 ```
+
+To try online play locally, open the site in two different browsers (or one normal and one private window), create a game in one and join from the other.
 
 ## Project layout
 
 ```
+firestore.rules        who may read what (only players read their game; nobody writes directly)
+firebase.json          emulator + rules config
 src/
   app/                 Next.js entry: layout, page, global styles/theme
-  components/          UI: Board, PieceLabel, Rules, Modal, Logo, MessApp (the shell)
+    api/games/         server routes: create / join / move / resign / flag
+  components/          UI: Board, PieceLabel, Rules, Modal, Logo, Controls, MessApp (the shell)
   lib/game/
     pieces.ts          which pieces exist and how they move
     engine.ts          rules: setup, legal moves, check/mate/stalemate/draws
     clock.ts           chess clock (pure functions, tested)
     rng.ts             seeded random numbers
+  lib/online/
+    game-doc.ts        an online game as stored, and the server-side rules for changing it
+    server.ts          API plumbing: token check, transactions
+    useOnlineGame.ts   React hook: create/join, live updates, server-synced clock
+  lib/firebase/        Firebase setup for the browser (client.ts) and server (admin.ts)
     *.test.ts          tests
 ```
 

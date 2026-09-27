@@ -83,17 +83,20 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 
 ---
 
-## 8. Coming next: backend and databases
+## 8. Backend, databases and security
 
-- **Supabase:** a hosted **PostgreSQL** database plus Auth plus Realtime.
-- **SQL:** tables, primary and foreign keys, `SELECT/INSERT/UPDATE`, indexes.
-- **Row Level Security (RLS):** database rules like "only the two players in a game can write moves". This is security at the data layer.
-- **Authentication:** password hashing, sessions and JWTs. You'll never store passwords yourself, and you should learn why.
-- **Realtime / WebSockets:** how the opponent's move appears on your screen without refreshing.
-- **Server authority:** never trust the client. The server (or a database function) should re-check that every move is legal using the same `engine.ts`.
-- **Environment variables:** `.env.local` keeps keys out of git.
-
----
+- **Client–server architecture:** two phones can't talk directly, so moves go phone → server → database → other phone.
+- **Firebase Auth:** each browser signs in (anonymously for now) and gets an **ID token**, a signed JWT that proves who it is. The API verifies it on every request (`requireUid` in `src/lib/online/server.ts`). Learn what a JWT is and why it's signed.
+- **Cloud Firestore (NoSQL):** data lives in *documents* inside *collections* (`games/{code}`) instead of SQL tables and rows. Compare with SQL: when is each better?
+- **Realtime listeners:** `onSnapshot` in `useOnlineGame.ts` keeps a live connection open, so the opponent's move appears without refreshing. Under the hood this is WebSockets/long-polling.
+- **Never trust the client:** browsers can be modified. So the browser may only *read* its own games (`firestore.rules`), and every change goes through `src/app/api/games`, which replays the game and checks the move with the same `engine.ts`. `game-doc.test.ts` tests these server rules.
+- **Transactions:** `updateGame` reads and writes inside a transaction, so two requests at the same moment can't both "win" (a race condition).
+- **Idempotency and stale requests:** each move carries `ply` (how many moves the client saw), so a double click or an old tab can't play twice.
+- **Clock sync:** device clocks disagree. Every API response includes `serverNow`, and the browser keeps the offset. See Cristian's algorithm and NTP.
+- **Secrets:** `NEXT_PUBLIC_*` values are shipped to every browser, so they must be safe to publish. The service-account key is server-only and git-ignored. Learn how environment variables work and why leaked keys get scraped from GitHub within minutes.
+- **Security testing:** this build was attacked with forged tokens, strangers, illegal moves and direct database writes. All were rejected. Try writing an automated test with `@firebase/rules-unit-testing`.
+- **Emulators:** `npm run dev:online` runs a fake Firebase on your laptop, so you can build and test without touching production data.
+- Coming with accounts: password hashing (bcrypt/scrypt), email verification, rate limiting, CAPTCHA/App Check.
 
 ## 9. Tools and workflow
 

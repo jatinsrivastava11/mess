@@ -11,10 +11,13 @@ export function Board({
   game,
   onMove,
   interactive,
+  flipped = false,
 }: {
   game: GameState;
   onMove: (from: number, to: number) => void;
   interactive: boolean;
+  /** Show the board from Black's side. */
+  flipped?: boolean;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const targets = selected === null || !interactive ? [] : legalTargets(game, selected);
@@ -38,9 +41,14 @@ export function Board({
       role="grid"
       aria-label="mess board"
     >
-      {game.board.map((piece, sq) => {
+      {game.board.map((_, i) => {
+        const sq = flipped ? game.board.length - 1 - i : i;
+        const piece = game.board[sq];
         const row = Math.floor(sq / BOARD_SIZE);
         const col = sq % BOARD_SIZE;
+        // Coordinates go on the left column and bottom row as the player sees them.
+        const leftEdge = i % BOARD_SIZE === 0;
+        const bottomEdge = i >= BOARD_SIZE * (BOARD_SIZE - 1);
         const dark = (row + col) % 2 === 1;
         const isTarget = targets.includes(sq);
         const highlight =
@@ -60,12 +68,12 @@ export function Board({
             aria-label={`${FILES[col]}${BOARD_SIZE - row}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${pieceDef(piece.n).label}` : ""}`}
           >
             {highlight && <span className="absolute inset-0" style={{ background: highlight }} />}
-            {col === 0 && (
+            {leftEdge && (
               <span className="absolute top-0.5 left-1 text-[clamp(8px,1.3vh,12px)] font-medium opacity-60" style={{ color: dark ? "var(--sq-light)" : "var(--sq-dark)" }}>
                 {BOARD_SIZE - row}
               </span>
             )}
-            {row === BOARD_SIZE - 1 && (
+            {bottomEdge && (
               <span className="absolute right-1 bottom-0.5 text-[clamp(8px,1.3vh,12px)] font-medium opacity-60" style={{ color: dark ? "var(--sq-light)" : "var(--sq-dark)" }}>
                 {FILES[col]}
               </span>

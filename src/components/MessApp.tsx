@@ -1,113 +1,161 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  type Clock,
-  TIME_CONTROLS_MIN,
-  type TimeControl,
-  flagged,
-  pressClock,
-  startClock,
-  stopClock,
-  timeLeft,
-} from "@/lib/game/clock";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type Clock, TIME_CONTROLS_MIN, type TimeControl, flagged, pressClock, startClock, stopClock } from "@/lib/game/clock";
 import { type Color, type GameState, makeMove, newGame, resign, timeout } from "@/lib/game/engine";
 import { randomSeed } from "@/lib/game/rng";
+import { onlineAvailable } from "@/lib/firebase/client";
+import { CODE_LENGTH, CODE_PATTERN, replay } from "@/lib/online/game-doc";
+import { useOnlineGame } from "@/lib/online/useOnlineGame";
 import { Board } from "./Board";
+import { ClockFace, IconButton, ThemeToggle, colorName } from "./Controls";
 import { Logo } from "./Logo";
 import { Button, Modal } from "./Modal";
 import { Rules } from "./Rules";
 
-// For now a game code is the board's seed in base 36 plus one digit for the time
-// control, and games are played on one device. When online play lands, codes
-// will point at a game stored in Supabase.
-const toCode = (seed: number, minutes: TimeControl) =>
-  seed.toString(36).toUpperCase().padStart(7, "0") + TIME_CONTROLS_MIN.indexOf(minutes);
-function fromCode(code: string): { seed: number; minutes: TimeControl } | null {
-  const clean = code.trim().toUpperCase();
-  if (!/^[0-9A-Z]{7}[0-9]$/.test(clean)) return null;
-  const seed = parseInt(clean.slice(0, 7), 36);
-  const minutes = TIME_CONTROLS_MIN[Number(clean[7])];
-  return seed < 2 ** 32 && minutes ? { seed, minutes } : null;
-}
-
 type Popup = null | "info" | "menu" | "profile" | "account" | "settings";
 type Home = "choose" | "create" | "join";
 
-const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** A pass-and-play game on this one device. */
+interface LocalGame {
+  game: GameState;
+  clock: Clock;
+}
+
+const DEMO = newGame(2026); // the board behind the home popup
 
 export function MessApp() {
-  const [game, setGame] = useState<GameState>(() => newGame(2026));
-  const [playing, setPlaying] = useState(false);
+  const online = useOnlineGame();
+  const [local, setLocal] = useState<LocalGame | null>(null);
   const [home, setHome] = useState<Home>("choose");
   const [popup, setPopup] = useState<Popup>(null);
-  const [pendingSeed, setPendingSeed] = useState(0);
   const [joinCode, setJoinCode] = useState("");
-  const [joinError, setJoinError] = useState("");
+  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [minutes, setMinutes] = useState<TimeControl>(10);
-  const [clock, setClock] = useState<Clock>(() => startClock(10, 0));
   const [now, setNow] = useState(0);
+  // Online move shown straight away while the server confirms it.
+  const [pending, setPending] = useState<{ from: number; to: number; ply: number } | null>(null);
+  const flagSent = useRef(false);
 
+  const doc = online.game;
+  const isOnline = online.code !== null;
+  const waiting = isOnline && !doc?.clock; // opponent hasn't joined yet
+  const playing = isOnline || local !== null;
+
+  const confirmed = useMemo(() => (doc ? replay(doc) : null), [doc]);
+  const game: GameState =
+    confirmed && pending?.ply === confirmed.history.length && confirmed.status.kind === "playing"
+      ? makeMove(confirmed, pending.from, pending.to)
+      : (confirmed ?? local?.game ?? DEMO);
+  const clock = isOnline ? (doc?.clock ?? null) : (local?.clock ?? null);
   const over = game.status.kind !== "playing";
+  const myColor: Color | null = isOnline ? online.color : null;
+  const pendingActive = pending !== null && pending.ply === confirmed?.history.length;
 
-  // Tick the display and check for a flag while a clock is running.
+  // Latest flag() without making the clock effect restart on every render.
+  const flagRef = useRef(online.flag);
   useEffect(() => {
-    if (!playing || !clock.running) return;
+    flagRef.current = online.flag;
+  });
+  const { serverNow } = online;
+
+  // Tick the clocks, and end the game when one runs out. Re-runs only when the clock itself changes.
+  useEffect(() => {
+    if (!clock?.running) return;
+    flagSent.current = false;
     const id = setInterval(() => {
-      const t = Date.now();
+      const t = isOnline ? serverNow() : Date.now();
       setNow(t);
       const loser = flagged(clock, t);
-      if (loser) {
-        setGame((g) => timeout(g, loser));
-        setClock((c) => stopClock(c, t));
+      if (!loser) return;
+      if (isOnline) {
+        // The server decides; ask once.
+        if (!flagSent.current) {
+          flagSent.current = true;
+          flagRef.current().catch(() => {});
+        }
+      } else {
+        setLocal((g) => g && { game: timeout(g.game, loser), clock: stopClock(g.clock, t) });
       }
     }, 100);
     return () => clearInterval(id);
-  }, [playing, clock]);
+  }, [clock, isOnline, serverNow]);
 
-  function start(seed: number, mins: TimeControl) {
+  useEffect(() => {
+    if (!error) return;
+    const id = setTimeout(() => setError(""), 4000);
+    return () => clearTimeout(id);
+  }, [error]);
+
+  function startLocal() {
     const t = Date.now();
-    setGame(newGame(seed));
-    setClock(startClock(mins, t));
+    setLocal({ game: newGame(randomSeed()), clock: startClock(minutes, t) });
     setNow(t);
-    setPlaying(true);
     setPopup(null);
   }
 
   function move(from: number, to: number) {
+    if (isOnline && confirmed) {
+      setPending({ from, to, ply: confirmed.history.length });
+      online.move(from, to).catch((e: Error) => {
+        setPending(null);
+        setError(e.message);
+      });
+      return;
+    }
     const t = Date.now();
-    const next = makeMove(game, from, to);
-    setGame(next);
-    setClock((c) => (next.status.kind === "playing" ? pressClock(c, t) : stopClock(c, t)));
+    setLocal((g) => {
+      if (!g) return g;
+      const next = makeMove(g.game, from, to);
+      return { game: next, clock: next.status.kind === "playing" ? pressClock(g.clock, t) : stopClock(g.clock, t) };
+    });
     setNow(t);
   }
 
   function goHome() {
-    setPlaying(false);
+    online.leave();
+    setLocal(null);
+    setPending(null);
     setHome("choose");
     setPopup(null);
     setJoinCode("");
-    setJoinError("");
   }
 
-  function createGame() {
-    setPendingSeed(randomSeed());
-    setCopied(false);
-    setHome("create");
+  async function createOnline() {
+    try {
+      setCopied(false);
+      await online.create(minutes);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
 
-  function join() {
-    const parsed = fromCode(joinCode);
-    if (!parsed) return setJoinError("That doesn't look like a game code.");
-    start(parsed.seed, parsed.minutes);
+  async function joinOnline() {
+    if (!CODE_PATTERN.test(joinCode)) return setError("Game codes are 6 letters and numbers.");
+    try {
+      await online.join(joinCode);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
 
-  function doResign() {
-    setGame((g) => resign(g, g.turn));
-    setClock((c) => stopClock(c, Date.now()));
+  async function doResign() {
+    if (isOnline) {
+      try {
+        await online.resign();
+      } catch (e) {
+        return setError((e as Error).message);
+      }
+    } else {
+      setLocal((g) => g && { game: resign(g.game, g.game.turn), clock: stopClock(g.clock, Date.now()) });
+    }
     goHome();
   }
+
+  const flipped = myColor === "b";
+  const [topColor, bottomColor]: Color[] = flipped ? ["w", "b"] : ["b", "w"];
+  const interactive = playing && !over && !waiting && (!isOnline || (game.turn === myColor && !pendingActive));
 
   return (
     <main className="relative flex h-dvh w-full items-center justify-center">
@@ -119,14 +167,14 @@ export function MessApp() {
         </div>
       </header>
 
-      {/* Top left: chess clocks while playing (above the board on phones), otherwise profile / account / settings */}
+      {/* Top left: chess clocks while playing (above/below the board on phones), otherwise profile / account / settings */}
       <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 sm:top-4 sm:left-4 sm:gap-2">
-        {playing ? (
+        {playing && clock ? (
           <div className="hidden flex-col gap-1.5 sm:flex">
-            <ClockFace color="b" clock={clock} now={now} />
-            <ClockFace color="w" clock={clock} now={now} />
+            <ClockFace color={topColor} clock={clock} now={now} />
+            <ClockFace color={bottomColor} clock={clock} now={now} />
           </div>
-        ) : (
+        ) : playing ? null : (
           <>
             <IconButton label="Profile" onClick={() => setPopup("profile")}>
               <circle cx="12" cy="8" r="4" />
@@ -144,7 +192,7 @@ export function MessApp() {
         )}
       </div>
 
-      {/* Top right: menu and rules */}
+      {/* Top right: rules and menu */}
       <div className="absolute top-3 right-3 z-10 flex gap-1.5 sm:top-4 sm:right-4 sm:gap-2">
         <IconButton label="Rules" onClick={() => setPopup("info")}>
           <circle cx="12" cy="12" r="9" />
@@ -155,21 +203,26 @@ export function MessApp() {
         </IconButton>
       </div>
 
-      {/* Centre: the board */}
+      {/* Centre: the board, with each clock next to its own side on phones */}
       <div className="mt-10 flex flex-col items-center gap-3">
-        {/* On phones each clock sits next to its own side of the board. */}
-        {playing && (
+        {playing && clock && (
           <div className="self-start sm:hidden">
-            <ClockFace color="b" clock={clock} now={now} />
+            <ClockFace color={topColor} clock={clock} now={now} />
           </div>
         )}
-        <Board game={game} onMove={move} interactive={playing && !over} />
-        {playing && (
+        <Board game={game} onMove={move} interactive={interactive} flipped={flipped} />
+        {playing && clock && (
           <div className="self-end sm:hidden">
-            <ClockFace color="w" clock={clock} now={now} />
+            <ClockFace color={bottomColor} clock={clock} now={now} />
           </div>
         )}
       </div>
+
+      {isOnline && !waiting && !over && (
+        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm text-muted">
+          {game.turn === myColor ? "Your move" : "Opponent's move"} · you are {myColor && colorName(myColor)}
+        </p>
+      )}
 
       {/* Bottom left: subtle site name */}
       <span className="absolute bottom-3 left-4 font-math text-sm text-muted opacity-60">mess</span>
@@ -179,6 +232,15 @@ export function MessApp() {
         <ThemeToggle />
       </div>
 
+      {error && (
+        <div
+          role="alert"
+          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-red-600 px-4 py-2 text-sm text-white shadow-lg"
+        >
+          {error}
+        </div>
+      )}
+
       {!playing && popup === null && (
         <Modal>
           {home === "choose" && (
@@ -187,7 +249,7 @@ export function MessApp() {
                 <Logo className="h-12 w-12" />
                 <p className="text-sm text-muted">Chess where every piece is a square root.</p>
               </div>
-              <Button onClick={createGame}>Create Game</Button>
+              <Button onClick={() => setHome("create")}>Create Game</Button>
               <Button variant="ghost" onClick={() => setHome("join")}>
                 Join Game
               </Button>
@@ -204,10 +266,7 @@ export function MessApp() {
                       key={m}
                       role="radio"
                       aria-checked={minutes === m}
-                      onClick={() => {
-                        setMinutes(m);
-                        setCopied(false);
-                      }}
+                      onClick={() => setMinutes(m)}
                       className={`rounded-xl border py-2 font-medium transition ${
                         minutes === m ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
                       }`}
@@ -217,25 +276,16 @@ export function MessApp() {
                   ))}
                 </div>
               </div>
-              <p className="text-sm text-muted">Your game code</p>
-              <button
-                onClick={() => {
-                  navigator.clipboard?.writeText(toCode(pendingSeed, minutes)).then(() => setCopied(true), () => {});
-                }}
-                className="w-full rounded-xl border border-dashed border-panel-border py-4 font-mono text-3xl tracking-[0.25em] hover:bg-fg/5"
-                title="Copy code"
-              >
-                {toCode(pendingSeed, minutes)}
-              </button>
-              <p className="text-center text-xs text-muted">{copied ? "Copied!" : "Click the code to copy it."}</p>
-              <p className="text-xs text-muted">
-                Online play is coming soon. For now, the same code always makes the same board, so you can play it here
-                on one device.
-              </p>
-              <Button onClick={() => start(pendingSeed, minutes)}>Start on this device</Button>
-              <Button variant="ghost" onClick={() => setHome("choose")}>
-                Back
+              <Button onClick={createOnline} disabled={!onlineAvailable || online.busy}>
+                {online.busy ? "Creating…" : "Create online game"}
               </Button>
+              <Button variant="ghost" onClick={startLocal}>
+                Play on this device
+              </Button>
+              {!onlineAvailable && <p className="text-xs text-muted">Online play isn&apos;t set up on this server yet.</p>}
+              <button onClick={() => setHome("choose")} className="w-full text-sm text-muted hover:text-fg">
+                Back
+              </button>
             </div>
           )}
           {home === "join" && (
@@ -243,30 +293,54 @@ export function MessApp() {
               className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                join();
+                joinOnline();
               }}
             >
               <h2 className="text-xl font-semibold">Join a game</h2>
               <input
                 autoFocus
                 value={joinCode}
-                onChange={(e) => {
-                  setJoinCode(e.target.value.toUpperCase());
-                  setJoinError("");
-                }}
-                placeholder="ENTER CODE"
-                maxLength={8}
-                className="w-full rounded-xl border border-panel-border bg-transparent px-4 py-3 text-center font-mono text-2xl tracking-[0.25em] outline-none focus:border-accent"
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                placeholder="CODE"
+                maxLength={CODE_LENGTH}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                aria-label="Game code"
+                className="w-full rounded-xl border border-panel-border bg-transparent px-4 py-3 text-center font-mono text-2xl tracking-[0.3em] outline-none focus:border-accent"
               />
-              {joinError && <p className="text-sm text-red-500">{joinError}</p>}
-              <Button type="submit" disabled={!joinCode}>
-                Join
+              <Button type="submit" disabled={joinCode.length !== CODE_LENGTH || online.busy || !onlineAvailable}>
+                {online.busy ? "Joining…" : "Join"}
               </Button>
-              <Button variant="ghost" onClick={() => setHome("choose")}>
+              <button type="button" onClick={() => setHome("choose")} className="w-full text-sm text-muted hover:text-fg">
                 Back
-              </Button>
+              </button>
             </form>
           )}
+        </Modal>
+      )}
+
+      {waiting && popup === null && (
+        <Modal title="Waiting for your opponent">
+          <div className="space-y-4">
+            <p className="text-sm text-muted">Send them this code. They choose Join Game and type it in.</p>
+            <button
+              onClick={() => navigator.clipboard?.writeText(online.code!).then(() => setCopied(true), () => {})}
+              className="w-full rounded-xl border border-dashed border-panel-border py-4 font-mono text-3xl tracking-[0.3em] hover:bg-fg/5"
+              title="Copy code"
+            >
+              {online.code}
+            </button>
+            <p className="text-center text-xs text-muted">
+              {copied ? "Copied!" : "Click the code to copy it."} · {doc?.minutes ?? minutes} min each
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm text-muted">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" /> Waiting…
+            </div>
+            <Button variant="ghost" onClick={goHome}>
+              Cancel
+            </Button>
+          </div>
         </Modal>
       )}
 
@@ -279,9 +353,13 @@ export function MessApp() {
       {popup === "menu" && (
         <Modal title="Menu" onClose={() => setPopup(null)}>
           <div className="space-y-3">
-            {playing && !over ? (
+            {playing && !over && !waiting ? (
               <>
-                <p className="text-sm text-muted">Resigning ends the game as a loss for {colorName(game.turn)}.</p>
+                <p className="text-sm text-muted">
+                  {isOnline
+                    ? "Resigning ends the game as a loss for you."
+                    : `Resigning ends the game as a loss for ${colorName(game.turn)}.`}
+                </p>
                 <Button variant="danger" onClick={doResign}>
                   Resign
                 </Button>
@@ -306,9 +384,9 @@ export function MessApp() {
       )}
 
       {playing && over && popup === null && (
-        <Modal title={resultTitle(game)}>
+        <Modal title={resultTitle(game, myColor)}>
           <p className="mb-4 text-sm text-muted">
-            {resultDetail(game)} after {game.history.length} moves.
+            {resultDetail(game)} after {game.history.length} {game.history.length === 1 ? "move" : "moves"}.
           </p>
           <div className="space-y-2">
             <Button onClick={goHome}>Back to home</Button>
@@ -322,9 +400,12 @@ export function MessApp() {
   );
 }
 
-function resultTitle(g: GameState) {
+function resultTitle(g: GameState, me: Color | null) {
   const s = g.status;
-  if (s.kind === "checkmate" || s.kind === "resigned" || s.kind === "timeout") return `${colorName(s.winner)} wins`;
+  if (s.kind === "checkmate" || s.kind === "resigned" || s.kind === "timeout") {
+    if (me) return s.winner === me ? "You win!" : "You lose";
+    return `${colorName(s.winner)} wins`;
+  }
   return "Draw";
 }
 
@@ -334,7 +415,7 @@ function resultDetail(g: GameState) {
     case "checkmate":
       return "Checkmate";
     case "resigned":
-      return "Resignation";
+      return `${colorName(s.winner === "w" ? "b" : "w")} resigned`;
     case "timeout":
       return `${colorName(s.winner === "w" ? "b" : "w")} ran out of time`;
     case "stalemate":
@@ -344,74 +425,4 @@ function resultDetail(g: GameState) {
     default:
       return "";
   }
-}
-
-/** mm:ss, switching to ss.t in the last 20 seconds. */
-function formatClock(ms: number) {
-  if (ms < 20_000) return (Math.floor(ms / 100) / 10).toFixed(1);
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function ClockFace({ color, clock, now }: { color: Color; clock: Clock; now: number }) {
-  const ms = timeLeft(clock, color, now);
-  const active = clock.running === color;
-  const low = ms < 20_000;
-  return (
-    <div
-      className={`flex min-w-32 items-center justify-between gap-3 rounded-xl border px-3 py-1.5 shadow-sm transition ${
-        active ? "border-fg bg-fg text-bg" : "border-panel-border bg-panel text-muted"
-      }`}
-      aria-label={`${colorName(color)} clock`}
-    >
-      <span className="flex items-center gap-1.5 text-xs font-medium">
-        <span
-          className="h-2.5 w-2.5 rounded-full ring-1 ring-current"
-          style={{ background: color === "w" ? "var(--piece-w-bg)" : "var(--piece-b-bg)" }}
-        />
-        {colorName(color)}
-      </span>
-      <span className={`font-mono text-lg tabular-nums ${low && active ? "text-red-500" : ""}`}>{formatClock(ms)}</span>
-    </div>
-  );
-}
-
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="flex h-9 w-9 items-center justify-center rounded-xl border sm:h-10 sm:w-10 border-panel-border bg-panel shadow-sm transition hover:scale-105"
-    >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-        {children}
-      </svg>
-    </button>
-  );
-}
-
-// Pure CSS: the `dark` class on <html> drives the knob position and icon, so there is no state to sync.
-function ThemeToggle() {
-  function toggle() {
-    const dark = document.documentElement.classList.toggle("dark");
-    try {
-      localStorage.setItem("mess-theme", dark ? "dark" : "light");
-    } catch {}
-  }
-  return (
-    <button
-      onClick={toggle}
-      aria-label="Toggle dark mode"
-      title="Toggle dark mode"
-      className="relative flex h-8 w-14 items-center rounded-full border border-panel-border bg-panel px-1 shadow-sm"
-    >
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fg text-bg transition-transform dark:translate-x-[22px]">
-        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
-          <circle cx="12" cy="12" r="5" className="dark:hidden" />
-          <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" className="hidden dark:block" />
-        </svg>
-      </span>
-    </button>
-  );
 }
