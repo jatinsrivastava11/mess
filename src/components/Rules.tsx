@@ -55,7 +55,15 @@ export function Rules() {
           <li><b>Checkmate</b>: the king is attacked and has no escape. That player loses.</li>
           <li><b>Stalemate</b>: the player to move has no legal move but isn&apos;t in check. It&apos;s a draw.</li>
           <li>It is also a draw when only the two kings are left, or after 50 moves each with no capture.</li>
-          <li>Resigning loses the game.</li>
+          <li>Resigning loses the game. Use the flag next to your clock (tap twice).</li>
+          <li>
+            <b>No move hints</b> after your first game: you calculate every move yourself. Want dots back? Play a{" "}
+            <b>Tutorial</b> game against the bot.
+          </li>
+          <li>
+            Press <b>←</b> and <b>→</b> (or ◀ ▶ under the board) to look back through the game. It only changes what you
+            see, never the game itself.
+          </li>
         </ul>
       </section>
       <section>

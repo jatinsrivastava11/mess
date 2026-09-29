@@ -12,7 +12,7 @@ import { CODE_LENGTH, CODE_PATTERN, replay } from "@/lib/online/game-doc";
 import { useOnlineGame } from "@/lib/online/useOnlineGame";
 import { AccountPanel, ProfilePanel } from "./AccountPanels";
 import { Board } from "./Board";
-import { ClockFace, IconButton, ThemeToggle, colorName } from "./Controls";
+import { ClockFace, IconButton, ResignFlag, ThemeToggle, colorName } from "./Controls";
 import { Logo } from "./Logo";
 import { Button, Modal } from "./Modal";
 import { Rules } from "./Rules";
@@ -24,10 +24,25 @@ type Home = "choose" | "create" | "join" | "bot";
 interface LocalGame {
   game: GameState;
   clock: Clock;
-  bot?: { level: Level; color: Color };
+  bot?: { level: Level; color: Color; tutorial?: boolean };
 }
 
 const DEMO = newGame(2026); // the board behind the home popup
+
+// Move dots are a training aid: only in your first game ever (on this device) and in tutorial games.
+const FIRST_GAME_DONE = "mess-first-game-done";
+function firstGameDone() {
+  try {
+    return localStorage.getItem(FIRST_GAME_DONE) === "1";
+  } catch {
+    return true; // storage blocked: don't nag every game
+  }
+}
+function markFirstGameDone() {
+  try {
+    localStorage.setItem(FIRST_GAME_DONE, "1");
+  } catch {}
+}
 
 export function MessApp() {
   const online = useOnlineGame();
@@ -35,7 +50,7 @@ export function MessApp() {
   const [local, setLocal] = useState<LocalGame | null>(null);
   const [home, setHome] = useState<Home>("choose");
   const [popup, setPopup] = useState<Popup>(null);
-  const [botLevel, setBotLevel] = useState<Level>("medium");
+  const [botLevel, setBotLevel] = useState<Level | "tutorial">("medium");
   const [humanSide, setHumanSide] = useState<Color | "random">("random");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState("");
@@ -45,6 +60,12 @@ export function MessApp() {
   // Online move shown straight away while the server confirms it.
   const [pending, setPending] = useState<{ from: number; to: number; ply: number } | null>(null);
   const flagSent = useRef(false);
+  // Move review (← →): how many moves into the game we're looking at, or null for the live position.
+  const [viewPly, setViewPly] = useState<number | null>(null);
+  const [hints, setHints] = useState(false);
+  const [firstGameNotice, setFirstGameNotice] = useState(false);
+  const [resultHidden, setResultHidden] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const doc = online.game;
   const isOnline = online.code !== null;
@@ -62,7 +83,7 @@ export function MessApp() {
   const myColor: Color | null = isOnline ? online.color : bot ? (bot.color === "w" ? "b" : "w") : null;
   // Usernames on the clocks for online games; guests show as White/Black; bot games show You vs Bot.
   const nameOf = (c: Color) =>
-    bot ? (c === bot.color ? `Bot · ${LEVELS[bot.level].label}` : "You") : (doc?.names?.[c] ?? colorName(c));
+    bot ? (c === bot.color ? `Bot · ${bot.tutorial ? "Tutorial" : LEVELS[bot.level].label}` : "You") : (doc?.names?.[c] ?? colorName(c));
   const opponent = myColor && doc?.names?.[myColor === "w" ? "b" : "w"];
   const pendingActive = pending !== null && pending.ply === confirmed?.history.length;
 
@@ -101,16 +122,62 @@ export function MessApp() {
     return () => clearTimeout(id);
   }, [error]);
 
-  function startLocal(withBot?: LocalGame["bot"]) {
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(""), 2500);
+    return () => clearTimeout(id);
+  }, [notice]);
+
+  // Once a game has finished, the first-game hints are used up.
+  useEffect(() => {
+    if (playing && over) markFirstGameDone();
+  }, [playing, over]);
+
+  // ← → step through earlier positions without changing the game; Home/End jump to the start/live.
+  const liveMoves = game.history.length;
+  const liveMovesRef = useRef(liveMoves);
+  useEffect(() => {
+    liveMovesRef.current = liveMoves;
+  });
+  useEffect(() => {
+    if (!playing) return;
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement;
+      if (el.closest("input, textarea, [role=dialog]")) return;
+      const total = liveMovesRef.current;
+      if (e.key === "ArrowLeft") setViewPly((v) => Math.max(0, (v ?? total) - 1));
+      else if (e.key === "ArrowRight") setViewPly((v) => (v === null || v + 1 >= total ? null : v + 1));
+      else if (e.key === "Home") setViewPly(total > 0 ? 0 : null);
+      else if (e.key === "End") setViewPly(null);
+      else return;
+      e.preventDefault();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [playing]);
+
+  /** Fresh game: reset review, decide on hints, and show the first-game notice if it applies. */
+  function beginGame(tutorial = false) {
+    const first = !firstGameDone();
+    setHints(first || tutorial);
+    setFirstGameNotice(first);
+    setViewPly(null);
+    setResultHidden(false);
+  }
+
+  function startLocal(withBot?: LocalGame["bot"], tutorial = false) {
     const t = Date.now();
     setLocal({ game: newGame(randomSeed()), clock: startClock(minutes, t), bot: withBot });
     setNow(t);
     setPopup(null);
+    beginGame(tutorial);
   }
 
   function startBotGame() {
     const human: Color = humanSide === "random" ? (Math.random() < 0.5 ? "w" : "b") : humanSide;
-    startLocal({ level: botLevel, color: human === "w" ? "b" : "w" });
+    // Tutorial = the Easy bot with move dots on.
+    const tutorial = botLevel === "tutorial";
+    startLocal({ level: tutorial ? "easy" : botLevel, color: human === "w" ? "b" : "w", tutorial }, tutorial);
   }
 
   // The bot's turn: ask it (in a background thread) and play its answer, unless the game moved on meanwhile.
@@ -153,6 +220,7 @@ export function MessApp() {
   }
 
   function goHome() {
+    if (playing && game.history.length > 0) markFirstGameDone();
     online.leave();
     setLocal(null);
     setPending(null);
@@ -165,6 +233,7 @@ export function MessApp() {
     try {
       setCopied(false);
       await online.create(minutes);
+      beginGame();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -174,6 +243,7 @@ export function MessApp() {
     if (!CODE_PATTERN.test(joinCode)) return setError("Game codes are 6 letters and numbers.");
     try {
       await online.join(joinCode);
+      beginGame();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -200,6 +270,30 @@ export function MessApp() {
   const interactive =
     playing && !over && !waiting && (isOnline ? game.turn === myColor && !pendingActive : !botToMove);
 
+  // The position on screen: live, or an earlier one while reviewing.
+  const reviewing = viewPly !== null && viewPly < liveMoves;
+  const shown = useMemo(() => {
+    if (!reviewing) return game;
+    let g = newGame(game.seed);
+    for (const m of game.history.slice(0, viewPly!)) g = makeMove(g, m.from, m.to);
+    return g;
+  }, [reviewing, viewPly, game]);
+  const step = (d: -1 | 1) =>
+    setViewPly((v) => {
+      if (d < 0) return Math.max(0, (v ?? liveMoves) - 1);
+      return v === null || v + 1 >= liveMoves ? null : v + 1;
+    });
+
+  // Resign flag sits next to your clock (pass-and-play: next to whoever is to move).
+  const canResign = playing && !over && !waiting;
+  const flagColor = myColor ?? game.turn;
+  const clockWithFlag = (c: Color, clk: NonNullable<typeof clock>) => (
+    <div className="flex items-center gap-1.5">
+      <ClockFace color={c} clock={clk} now={now} label={nameOf(c)} />
+      {canResign && c === flagColor && <ResignFlag onResign={doResign} />}
+    </div>
+  );
+
   return (
     <main className="relative flex h-dvh w-full items-center justify-center">
       {/* Top centre: spotlighted title */}
@@ -214,8 +308,8 @@ export function MessApp() {
       <div className={`absolute top-3 left-3 ${cornerLayer} flex items-center gap-1.5 sm:top-4 sm:left-4 sm:gap-2`}>
         {playing && clock ? (
           <div className="hidden flex-col gap-1.5 sm:flex">
-            <ClockFace color={topColor} clock={clock} now={now} label={nameOf(topColor)} />
-            <ClockFace color={bottomColor} clock={clock} now={now} label={nameOf(bottomColor)} />
+            {clockWithFlag(topColor, clock)}
+            {clockWithFlag(bottomColor, clock)}
           </div>
         ) : playing ? null : (
           <>
@@ -249,24 +343,75 @@ export function MessApp() {
       {/* Centre: the board, with each clock next to its own side on phones */}
       <div className="mt-10 flex flex-col items-center gap-3">
         {playing && clock && (
-          <div className="self-start sm:hidden">
-            <ClockFace color={topColor} clock={clock} now={now} label={nameOf(topColor)} />
-          </div>
+          <div className="self-start sm:hidden">{clockWithFlag(topColor, clock)}</div>
         )}
-        <Board game={game} onMove={move} interactive={interactive} flipped={flipped} />
+        <Board
+          game={shown}
+          onMove={move}
+          interactive={interactive && !reviewing}
+          flipped={flipped}
+          showHints={hints}
+          onIllegal={(from) => {
+            const n = game.board[from]?.n;
+            setNotice(n ? `${n === 1 ? "The king" : `√${n}`} can't move there.` : "That move isn't allowed.");
+          }}
+        />
         {playing && clock && (
-          <div className="self-end sm:hidden">
-            <ClockFace color={bottomColor} clock={clock} now={now} label={nameOf(bottomColor)} />
-          </div>
+          <div className="self-end sm:hidden">{clockWithFlag(bottomColor, clock)}</div>
         )}
       </div>
 
-      {(isOnline || bot) && !waiting && !over && (
-        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm text-muted">
-          {game.turn === myColor ? "Your move" : bot ? "Bot is thinking…" : "Opponent's move"} · you are{" "}
-          {myColor && colorName(myColor)}
-          {opponent && ` · vs ${opponent}`}
-        </p>
+      {/* Bottom centre: move review controls and whose turn it is */}
+      {playing && !waiting && (
+        <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 text-sm text-muted">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => step(-1)}
+              disabled={(viewPly ?? liveMoves) === 0}
+              aria-label="Previous move"
+              title="Previous move (←)"
+              className="rounded-lg px-2 py-1 hover:bg-fg/10 disabled:opacity-30"
+            >
+              ◀
+            </button>
+            <span className="min-w-28 text-center tabular-nums">
+              {reviewing ? (
+                <span className="font-medium text-accent">
+                  Move {viewPly} of {liveMoves}
+                </span>
+              ) : (
+                `Move ${liveMoves}`
+              )}
+            </span>
+            <button
+              onClick={() => step(1)}
+              disabled={!reviewing}
+              aria-label="Next move"
+              title="Next move (→)"
+              className="rounded-lg px-2 py-1 hover:bg-fg/10 disabled:opacity-30"
+            >
+              ▶
+            </button>
+            {reviewing && (
+              <button onClick={() => setViewPly(null)} className="rounded-lg px-2 py-1 text-accent hover:bg-fg/10">
+                Back to game
+              </button>
+            )}
+          </div>
+          {!reviewing && (isOnline || bot) && !over && (
+            <p>
+              {game.turn === myColor ? "Your move" : bot ? "Bot is thinking…" : "Opponent's move"} · you are{" "}
+              {myColor && colorName(myColor)}
+              {opponent && ` · vs ${opponent}`}
+              {hints && " · hints on"}
+            </p>
+          )}
+          {over && resultHidden && (
+            <button onClick={goHome} className="rounded-lg px-2 py-1 text-accent hover:bg-fg/10">
+              Game over · back to home
+            </button>
+          )}
+        </div>
       )}
 
       {/* Bottom left: subtle site name */}
@@ -276,6 +421,15 @@ export function MessApp() {
       <div className={`absolute right-4 bottom-4 ${cornerLayer}`}>
         <ThemeToggle />
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-fg px-4 py-2 text-sm text-bg shadow-lg"
+        >
+          {notice}
+        </div>
+      )}
 
       {error && (
         <div
@@ -307,20 +461,26 @@ export function MessApp() {
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Play vs Bot</h2>
               <div className="space-y-2" role="radiogroup" aria-label="Bot level">
-                {(Object.keys(LEVELS) as Level[]).map((l) => (
-                  <button
-                    key={l}
-                    role="radio"
-                    aria-checked={botLevel === l}
-                    onClick={() => setBotLevel(l)}
-                    className={`w-full rounded-xl border px-4 py-2.5 text-left transition ${
-                      botLevel === l ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
-                    }`}
-                  >
-                    <span className="block font-medium">{LEVELS[l].label}</span>
-                    <span className={`block text-xs ${botLevel === l ? "opacity-70" : "text-muted"}`}>{LEVELS[l].blurb}</span>
-                  </button>
-                ))}
+                {(["tutorial", ...Object.keys(LEVELS)] as (Level | "tutorial")[]).map((l) => {
+                  const info =
+                    l === "tutorial"
+                      ? { label: "Tutorial", blurb: "Easy bot, with dots showing where your pieces can move." }
+                      : LEVELS[l];
+                  return (
+                    <button
+                      key={l}
+                      role="radio"
+                      aria-checked={botLevel === l}
+                      onClick={() => setBotLevel(l)}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-left transition ${
+                        botLevel === l ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
+                      }`}
+                    >
+                      <span className="block font-medium">{info.label}</span>
+                      <span className={`block text-xs ${botLevel === l ? "opacity-70" : "text-muted"}`}>{info.blurb}</span>
+                    </button>
+                  );
+                })}
               </div>
               <div>
                 <p className="mb-2 text-sm text-muted">You play</p>
@@ -463,16 +623,10 @@ export function MessApp() {
         <Modal title="Menu" onClose={() => setPopup(null)}>
           <div className="space-y-3">
             {playing && !over && !waiting ? (
-              <>
-                <p className="text-sm text-muted">
-                  {isOnline || bot
-                    ? "Resigning ends the game as a loss for you."
-                    : `Resigning ends the game as a loss for ${colorName(game.turn)}.`}
-                </p>
-                <Button variant="danger" onClick={doResign}>
-                  Resign
-                </Button>
-              </>
+              <p className="text-sm text-muted">
+                To resign, use the flag next to your clock. Use ← → (or ◀ ▶ under the board) to look back through the
+                moves.
+              </p>
             ) : playing ? (
               <Button onClick={goHome}>Back to home</Button>
             ) : (
@@ -500,15 +654,33 @@ export function MessApp() {
         </Modal>
       )}
 
-      {playing && over && popup === null && (
+      {firstGameNotice && playing && !waiting && popup === null && (
+        <Modal title="Your first game">
+          <div className="space-y-3 text-sm">
+            <p>
+              In this game only, <b>dots show where each piece can move</b>.
+            </p>
+            <p>
+              After this game, you&apos;re on your own: work out every move from the maths. √n jumps a squares one way and b
+              the other, where a² + b² = n, and equal sides move in a straight line.
+            </p>
+            <p className="text-muted">
+              Want the dots back? Choose <b>Tutorial</b> in Play vs Bot. The rules (i) always show every piece&apos;s moves.
+            </p>
+            <Button onClick={() => setFirstGameNotice(false)}>Got it</Button>
+          </div>
+        </Modal>
+      )}
+
+      {playing && over && popup === null && !resultHidden && (
         <Modal title={resultTitle(game, myColor)}>
           <p className="mb-4 text-sm text-muted">
             {resultDetail(game)} after {game.history.length} {game.history.length === 1 ? "move" : "moves"}.
           </p>
           <div className="space-y-2">
             <Button onClick={goHome}>Back to home</Button>
-            <Button variant="ghost" onClick={() => setPopup("menu")}>
-              View board
+            <Button variant="ghost" onClick={() => setResultHidden(true)}>
+              Review the game
             </Button>
           </div>
         </Modal>

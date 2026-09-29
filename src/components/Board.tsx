@@ -12,12 +12,18 @@ export function Board({
   onMove,
   interactive,
   flipped = false,
+  showHints = false,
+  onIllegal,
 }: {
   game: GameState;
   onMove: (from: number, to: number) => void;
   interactive: boolean;
   /** Show the board from Black's side. */
   flipped?: boolean;
+  /** Dots on the squares the selected piece can reach (first game and tutorials only). */
+  showHints?: boolean;
+  /** Called when the player tries a square the selected piece can't reach. */
+  onIllegal?: (from: number) => void;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const targets = selected === null || !interactive ? [] : legalTargets(game, selected);
@@ -32,7 +38,10 @@ export function Board({
       return;
     }
     const piece = game.board[sq];
-    setSelected(piece && piece.color === game.turn && sq !== selected ? sq : null);
+    const own = piece && piece.color === game.turn;
+    // Without hints, a wrong square is a real mistake worth telling the player about.
+    if (selected !== null && !own && sq !== selected) onIllegal?.(selected);
+    setSelected(own && sq !== selected ? sq : null);
   }
 
   return (
@@ -50,7 +59,7 @@ export function Board({
         const leftEdge = i % BOARD_SIZE === 0;
         const bottomEdge = i >= BOARD_SIZE * (BOARD_SIZE - 1);
         const dark = (row + col) % 2 === 1;
-        const isTarget = targets.includes(sq);
+        const isTarget = showHints && targets.includes(sq);
         const highlight =
           sq === checkedKing
             ? "var(--check)"

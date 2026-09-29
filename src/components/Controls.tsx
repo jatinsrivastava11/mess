@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { type Clock, timeLeft } from "@/lib/game/clock";
 import type { Color } from "@/lib/game/engine";
 
@@ -72,6 +72,31 @@ export function ThemeToggle() {
           <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" className="hidden dark:block" />
         </svg>
       </span>
+    </button>
+  );
+}
+
+/** Resign in two taps: the first asks, the second confirms. It resets itself after 3 seconds. */
+export function ResignFlag({ onResign }: { onResign: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const id = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(id);
+  }, [confirming]);
+  return (
+    <button
+      onClick={() => (confirming ? onResign() : setConfirming(true))}
+      aria-label={confirming ? "Tap again to resign" : "Resign"}
+      title={confirming ? "Tap again to resign" : "Resign"}
+      className={`flex h-9 items-center justify-center gap-1.5 rounded-xl border px-2.5 text-sm font-medium shadow-sm transition ${
+        confirming ? "border-red-600 bg-red-600 text-white" : "border-panel-border bg-panel text-muted hover:text-fg"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+      </svg>
+      {confirming && <span>Resign?</span>}
     </button>
   );
 }

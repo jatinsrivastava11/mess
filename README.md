@@ -46,11 +46,16 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [x] Every move is checked on the server. Players can't write to the database directly, so a modified browser can't cheat.
 - [x] Pass-and-play on one device
 - [x] Chess clock for each player (3, 5 or 10 minutes, picked when creating a game). Running out of time loses.
-- [x] Big centred board, rules (i) popup, menu with resign, light/dark toggle
+- [x] Big centred board, rules (i) popup, light/dark toggle
+- [x] **No move hints** after your first game ever (it opens with a notice explaining this); **Tutorial** games vs the bot bring the dots back. Illegal tries get a message.
+- [x] **Move review:** ← → (or ◀ ▶) step through earlier positions without changing the game; Home/End jump to the start/live position
+- [x] **Resign** with the flag next to your clock (two taps to confirm)
+- [x] Keyboard focus outlines and reduced-motion support
 - [x] Phone layout: board fills the width, clocks sit above and below it
 - [x] **Accounts:** email + password with a unique username. Guests can still play; accounts save wins.
 - [x] **Profile:** username and wins (achievements coming). Wins count only for verified emails, only after 10+ moves, and are recorded by the server.
 - [ ] Achievements
+- [ ] Elo rating
 - [ ] Bot protection (App Check / reCAPTCHA) once the site has its public address
 - [ ] Settings
 - [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. In bot-vs-bot tests each level beats the one below about 90% of the time.
