@@ -189,7 +189,7 @@ export function bestMove(
 const DEFAULT_TABLES = buildTables(TRAINED_WEIGHTS);
 
 export const LEVELS: Record<Level, { label: string; blurb: string }> = {
-  easy: { label: "Easy", blurb: "Looks one move ahead and often gets it wrong." },
+  easy: { label: "Easy", blurb: "Never thinks about your reply, and often plays carelessly." },
   medium: { label: "Medium", blurb: "Looks two moves ahead and rarely blunders." },
   hard: { label: "Hard", blurb: "Thinks deeply for about a second and a half." },
 };
@@ -208,10 +208,23 @@ export function chooseMove(
 
   if (level === "hard") return pick(bestMove(pos, tables, { timeMs: 1500, quiet: game.quietMoves }).move);
 
-  const depth = level === "easy" ? 1 : 2;
-  const margin = level === "easy" ? 150 : 25; // how much worse than best a move may be and still be chosen
-  if (level === "easy" && rand() < 0.2) return pick(moves[Math.floor(rand() * moves.length)]);
-  const scored = scoreAll(pos, tables, depth, game.quietMoves);
+  if (level === "easy") {
+    // Tuned so a beginner who just grabs free pieces beats it more often than not:
+    // a random move 30% of the time; otherwise judge only its own move, never your reply.
+    if (rand() < 0.3) return pick(moves[Math.floor(rand() * moves.length)]);
+    const scored = moves.map((move) => {
+      makeMove(pos, move);
+      const score = -evaluate(pos, tables);
+      unmakeMove(pos, move);
+      return { move, score };
+    });
+    const top = Math.max(...scored.map((x) => x.score));
+    const good = scored.filter((x) => x.score >= top - 100);
+    return pick(good[Math.floor(rand() * good.length)].move);
+  }
+
+  const margin = 25; // Medium: how much worse than best a move may be and still be chosen
+  const scored = scoreAll(pos, tables, 2, game.quietMoves);
   const top = Math.max(...scored.map((s) => s.score));
   const good = scored.filter((s) => s.score >= top - margin);
   return pick(good[Math.floor(rand() * good.length)].move);

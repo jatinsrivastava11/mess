@@ -125,7 +125,7 @@ The bot has two halves: **search** (looking ahead) and **evaluation** (judging a
 - **Floating-point care:** maths points compare sums of square roots, which computers can't store exactly (√2 is irrational), so equality uses a tiny tolerance (`1e-9`) instead of `===`.
 - **Validation discipline:** new weights are only saved if they beat the old ones in matches on boards never used in training (a train/validation split). That safeguard is why no worse weights were shipped.
 - **Measuring strength:** `npm run bot:levels` plays the levels against each other and reports wins, draws and losses, not just a score, because draws can hide differences.
-- **Difficulty levels:** Easy looks 1 move ahead and sometimes plays randomly, Medium looks 2 ahead, Hard deepens for 1.5 s. Making a bot *weaker* on purpose, in a human-feeling way, is its own design problem.
+- **Difficulty levels:** Easy judges only its own move (never your reply) and plays randomly 30% of the time; Medium looks 2 moves ahead; Hard deepens for 1.5 s. Easy was tuned against a scripted "greedy beginner" (takes the biggest capture, otherwise random) until the beginner won more often. The first Easy was too strong because it still checked for recaptures. Making a bot *weaker* on purpose, in a human-feeling way, is its own design problem.
 - **Web Workers:** `bot.worker.ts` runs the search in a background thread so the page doesn't freeze.
 - Going further: transposition tables and Zobrist hashing, Monte Carlo Tree Search, and neural-network evaluation (AlphaZero, NNUE).
 

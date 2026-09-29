@@ -4,6 +4,7 @@
 // Run: npm run bot:levels   (HARD_MS=300 by default; the site gives Hard 1500 ms,
 // so the real Hard is stronger than what this measures.)
 
+import { legalTargets } from "../src/lib/game/engine";
 import { mulberry32 } from "../src/lib/game/rng";
 import { fromBoard, moveFrom, moveTo } from "../src/lib/bot/board";
 import { buildTables } from "../src/lib/bot/evaluate";
@@ -22,9 +23,25 @@ const hard: Player = (g) => {
   return { from: moveFrom(r.move), to: moveTo(r.move) };
 };
 
+// Stand-ins for a new human player, to check that Easy really is easy.
+const allMoves = (g: Parameters<Player>[0]) =>
+  g.board.flatMap((_, from) => legalTargets(g, from).map((to) => ({ from, to })));
+const randomMover: Player = (g) => {
+  const moves = allMoves(g);
+  return moves[Math.floor(rand() * moves.length)] ?? null;
+};
+/** Takes the most valuable capture it sees (by √n), otherwise plays randomly. Never thinks ahead. */
+const greedy: Player = (g) => {
+  const moves = allMoves(g);
+  const captures = moves.filter((m) => g.board[m.to]).sort((a, b) => g.board[b.to]!.n - g.board[a.to]!.n);
+  return captures[0] ?? moves[Math.floor(rand() * moves.length)] ?? null;
+};
+
 const seeds = (n: number, base: number) => Array.from({ length: n }, (_, i) => base + i);
 
 for (const [name, a, b, n] of [
+  ["Easy vs Random mover", easy, randomMover, 20],
+  ["Easy vs Greedy beginner", easy, greedy, 20],
   ["Medium vs Easy", medium, easy, 30],
   ["Hard vs Medium", hard, medium, 12],
   ["Hard vs Easy", hard, easy, 8],
