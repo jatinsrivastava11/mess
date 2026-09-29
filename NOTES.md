@@ -96,7 +96,13 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Secrets:** `NEXT_PUBLIC_*` values are shipped to every browser, so they must be safe to publish. The service-account key is server-only and git-ignored. Learn how environment variables work and why leaked keys get scraped from GitHub within minutes.
 - **Security testing:** this build was attacked with forged tokens, strangers, illegal moves and direct database writes. All were rejected. Try writing an automated test with `@firebase/rules-unit-testing`.
 - **Emulators:** `npm run dev:online` runs a fake Firebase on your laptop, so you can build and test without touching production data.
-- Coming with accounts: password hashing (bcrypt/scrypt), email verification, rate limiting, CAPTCHA/App Check.
+- **Accounts (`src/lib/account/`):** a guest is upgraded with `linkWithCredential`, so the same user id keeps its game. Learn how account linking works.
+- **Password storage:** Firebase stores only a *salted hash* (scrypt), never the password. Look up why hashing beats encryption for passwords, and what a salt is.
+- **Email-enumeration protection:** "wrong email or password" is deliberately vague, and "reset link sent" is shown even for unknown emails. Otherwise attackers could test which emails have accounts.
+- **Uniqueness with an index document:** `usernames/{name}` points to its owner. Claiming a name creates that doc inside a transaction, so two people can't take the same name at the same moment.
+- **Anti-farming:** wins need a verified email, a real opponent and 10+ moves (`winnerToCredit` in `game-doc.ts`). Think about what else a cheater could try.
+- **Defence in depth:** client checks (nice error messages) plus server checks (the real protection) plus database rules (the last wall). Never rely on the client alone.
+- Still to add: App Check / reCAPTCHA against bots, restricting the web API key to the site's domain.
 
 ## 9. Tools and workflow
 

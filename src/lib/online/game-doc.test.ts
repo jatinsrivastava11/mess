@@ -10,6 +10,7 @@ import {
   randomCode,
   replay,
   resignDoc,
+  winnerToCredit,
 } from "./game-doc";
 
 const T0 = 1_000_000;
@@ -85,5 +86,27 @@ describe("online game rules", () => {
     const out = resignDoc(started(), "bob", T0);
     expect(out.doc!.status).toEqual({ kind: "resigned", winner: "w" });
     expect(out.doc!.clock!.running).toBeNull();
+  });
+
+  it("stores usernames for signed-in players", () => {
+    const doc = createDoc({ code: "ABCDEF", uid: "alice", name: "alice_1", minutes: 3, seed: 7, creatorColor: "b", now: T0 });
+    expect(joinDoc(doc, "bob", T0, null).doc!.names).toEqual({ w: null, b: "alice_1" });
+  });
+
+  it("credits a win only for a decisive result after enough moves", () => {
+    let doc = started();
+    // A resignation right away doesn't count.
+    expect(winnerToCredit(doc, resignDoc(doc, "bob", T0).doc!)).toBeNull();
+    for (let i = 0; i < 10; i++) {
+      const m = anyMove(doc);
+      const next = moveDoc(doc, doc.moves.length % 2 === 0 ? "alice" : "bob", m.from, m.to, doc.moves.length, T0 + i);
+      expect(next.doc?.status.kind).toBe("playing");
+      doc = next.doc!;
+    }
+    expect(doc.moves).toHaveLength(10);
+    const resigned = resignDoc(doc, "bob", T0 + 20).doc!;
+    expect(winnerToCredit(doc, resigned)).toBe("alice");
+    // Already over: no second credit.
+    expect(winnerToCredit(resigned, resigned)).toBeNull();
   });
 });

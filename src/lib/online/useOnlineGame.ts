@@ -4,6 +4,7 @@ import { doc as docRef, onSnapshot } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TimeControl } from "../game/clock";
 import type { Color } from "../game/engine";
+import { api } from "../firebase/api";
 import { currentUser, firebase } from "../firebase/client";
 import { type GameDoc, colorOf } from "./game-doc";
 
@@ -56,17 +57,10 @@ export function useOnlineGame() {
   }, []);
 
   const call = useCallback(async (path: string, body: Record<string, unknown>) => {
-    const user = await currentUser();
-    setUid(user.uid);
     const sent = Date.now();
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken()}` },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
+    const data = await api(path, body);
+    setUid(data.uid);
     if (typeof data.serverNow === "number") offset.current = data.serverNow - (sent + Date.now()) / 2;
-    if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
     return data;
   }, []);
 

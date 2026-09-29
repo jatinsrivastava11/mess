@@ -11,6 +11,8 @@ export interface GameDoc {
   seed: number;
   minutes: TimeControl;
   players: Record<Color, string | null>;
+  /** Usernames of signed-in players (null for guests). Missing on games created before accounts existed. */
+  names?: Record<Color, string | null>;
   moves: { from: number; to: number }[];
   status: Status;
   /** null until both players have joined. */
@@ -54,17 +56,19 @@ export function colorOf(doc: GameDoc, uid: string): Color | null {
 export function createDoc(opts: {
   code: string;
   uid: string;
+  name?: string | null;
   minutes: TimeControl;
   seed: number;
   creatorColor: Color;
   now: number;
 }): GameDoc {
-  const { code, uid, minutes, seed, creatorColor, now } = opts;
+  const { code, uid, name = null, minutes, seed, creatorColor, now } = opts;
   return {
     code,
     seed,
     minutes,
     players: { w: creatorColor === "w" ? uid : null, b: creatorColor === "b" ? uid : null },
+    names: { w: creatorColor === "w" ? name : null, b: creatorColor === "b" ? name : null },
     moves: [],
     status: { kind: "playing" },
     clock: null,
@@ -73,12 +77,27 @@ export function createDoc(opts: {
   };
 }
 
-export function joinDoc(doc: GameDoc, uid: string, now: number): Outcome {
+export function joinDoc(doc: GameDoc, uid: string, now: number, name: string | null = null): Outcome {
   if (colorOf(doc, uid)) return {}; // already in: rejoining is fine
   if (doc.players.w && doc.players.b) return { error: "This game is already full.", httpStatus: 409 };
   if (doc.status.kind !== "playing") return { error: "This game has ended.", httpStatus: 409 };
-  const players = { ...doc.players, [doc.players.w ? "b" : "w"]: uid };
-  return { doc: { ...doc, players, clock: startClock(doc.minutes, now), updatedAt: now } };
+  const seat: Color = doc.players.w ? "b" : "w";
+  const players = { ...doc.players, [seat]: uid };
+  const names = { w: doc.names?.w ?? null, b: doc.names?.b ?? null, [seat]: name };
+  return { doc: { ...doc, players, names, clock: startClock(doc.minutes, now), updatedAt: now } };
+}
+
+/** A game needs at least this many moves (both sides) before a win counts, so instant resignations can't farm wins. */
+export const MIN_MOVES_FOR_WIN = 10;
+
+/** The uid to credit with a win if this change just ended the game decisively, else null. */
+export function winnerToCredit(before: GameDoc, after: GameDoc): string | null {
+  if (before.status.kind !== "playing" || after.status.kind === "playing") return null;
+  if (!("winner" in after.status)) return null; // draws don't count
+  if (after.moves.length < MIN_MOVES_FOR_WIN) return null;
+  const winner = after.players[after.status.winner];
+  const loser = after.players[after.status.winner === "w" ? "b" : "w"];
+  return winner && loser && winner !== loser ? winner : null;
 }
 
 /** Ends the game if the player to move has run out of time. */

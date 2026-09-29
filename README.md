@@ -48,12 +48,23 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [x] Chess clock for each player (3, 5 or 10 minutes, picked when creating a game). Running out of time loses.
 - [x] Big centred board, rules (i) popup, menu with resign, light/dark toggle
 - [x] Phone layout: board fills the width, clocks sit above and below it
-- [ ] Email + password accounts (Firebase Auth), with email verification and bot protection
-- [ ] Profile: wins and achievements
+- [x] **Accounts:** email + password with a unique username. Guests can still play; accounts save wins.
+- [x] **Profile:** username and wins (achievements coming). Wins count only for verified emails, only after 10+ moves, and are recorded by the server.
+- [ ] Achievements
+- [ ] Bot protection (App Check / reCAPTCHA) once the site has its public address
 - [ ] Settings
 - [ ] **Phase 2:** play against a bot
 
-Online players are anonymous for now. Each browser gets an invisible identity, and email accounts will attach to it later.
+Guests play with an invisible identity. Creating an account upgrades that same identity, so a game in progress isn't lost.
+
+### Security
+
+- Passwords are handled by Firebase Auth. We never see or store them. At least 8 characters with a number, enforced by Firebase itself.
+- Email verification is required before wins count. Password reset goes through email.
+- Email-enumeration protection is on: login errors never reveal whether an email has an account.
+- The database is read-only from browsers (`firestore.rules`). Games are visible only to their two players, and profiles show only username and wins (never email).
+- Every write (moves, usernames, wins) goes through the API routes, which verify the user's token and re-check the game with the engine inside a transaction.
+- Secrets (`service-account.json`, `.env*.local`) are git-ignored and never reach the browser.
 
 ## Tech
 
@@ -86,7 +97,8 @@ firebase.json          emulator + rules config
 src/
   app/                 Next.js entry: layout, page, global styles/theme
     api/games/         server routes: create / join / move / resign / flag
-  components/          UI: Board, PieceLabel, Rules, Modal, Logo, Controls, MessApp (the shell)
+    api/account/       server route: check / claim a username
+  components/          UI: Board, PieceLabel, Rules, Modal, Logo, Controls, AccountPanels, MessApp (the shell)
   lib/game/
     pieces.ts          which pieces exist and how they move
     engine.ts          rules: setup, legal moves, check/mate/stalemate/draws
@@ -96,7 +108,8 @@ src/
     game-doc.ts        an online game as stored, and the server-side rules for changing it
     server.ts          API plumbing: token check, transactions
     useOnlineGame.ts   React hook: create/join, live updates, server-synced clock
-  lib/firebase/        Firebase setup for the browser (client.ts) and server (admin.ts)
+  lib/account/         username/password rules, useAccount hook (sign up/in/out, verify, reset)
+  lib/firebase/        Firebase setup for the browser (client.ts, api.ts) and server (admin.ts)
     *.test.ts          tests
 ```
 

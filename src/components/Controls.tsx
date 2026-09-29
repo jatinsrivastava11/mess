@@ -13,7 +13,7 @@ function formatClock(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function ClockFace({ color, clock, now }: { color: Color; clock: Clock; now: number }) {
+export function ClockFace({ color, clock, now, label }: { color: Color; clock: Clock; now: number; label?: string }) {
   const ms = timeLeft(clock, color, now);
   const active = clock.running === color;
   const low = ms < 20_000;
@@ -29,7 +29,7 @@ export function ClockFace({ color, clock, now }: { color: Color; clock: Clock; n
           className="h-2.5 w-2.5 rounded-full ring-1 ring-current"
           style={{ background: color === "w" ? "var(--piece-w-bg)" : "var(--piece-b-bg)" }}
         />
-        {colorName(color)}
+        <span className="max-w-24 truncate">{label ?? colorName(color)}</span>
       </span>
       <span className={`font-mono text-lg tabular-nums ${low && active ? "text-red-500" : ""}`}>{formatClock(ms)}</span>
     </div>

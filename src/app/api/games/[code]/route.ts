@@ -1,6 +1,6 @@
 // POST /api/games/:code  { action: "join" | "move" | "resign" | "flag", from?, to?, ply? }
 import { CODE_PATTERN, colorOf, flagDoc, joinDoc, moveDoc, resignDoc } from "@/lib/online/game-doc";
-import { HttpError, readJson, reply, replyError, requireUid, updateGame } from "@/lib/online/server";
+import { HttpError, readJson, reply, replyError, requireUid, updateGame, usernameOf } from "@/lib/online/server";
 
 const isSquare = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) < 64;
 
@@ -10,12 +10,13 @@ export async function POST(req: Request, ctx: RouteContext<"/api/games/[code]">)
     const code = (await ctx.params).code.toUpperCase();
     if (!CODE_PATTERN.test(code)) throw new HttpError(404, "No game with that code.");
     const body = await readJson(req);
+    const name = body.action === "join" ? await usernameOf(uid) : null;
 
     let color: string | null = null;
     const out = await updateGame(code, (doc, now) => {
       switch (body.action) {
         case "join": {
-          const result = joinDoc(doc, uid, now);
+          const result = joinDoc(doc, uid, now, name);
           color = colorOf(result.doc ?? doc, uid);
           return result;
         }

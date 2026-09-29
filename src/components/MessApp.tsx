@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type Clock, TIME_CONTROLS_MIN, type TimeControl, flagged, pressClock, startClock, stopClock } from "@/lib/game/clock";
 import { type Color, type GameState, makeMove, newGame, resign, timeout } from "@/lib/game/engine";
 import { randomSeed } from "@/lib/game/rng";
+import { useAccount } from "@/lib/account/useAccount";
 import { onlineAvailable } from "@/lib/firebase/client";
 import { CODE_LENGTH, CODE_PATTERN, replay } from "@/lib/online/game-doc";
 import { useOnlineGame } from "@/lib/online/useOnlineGame";
+import { AccountPanel, ProfilePanel } from "./AccountPanels";
 import { Board } from "./Board";
 import { ClockFace, IconButton, ThemeToggle, colorName } from "./Controls";
 import { Logo } from "./Logo";
@@ -26,6 +28,7 @@ const DEMO = newGame(2026); // the board behind the home popup
 
 export function MessApp() {
   const online = useOnlineGame();
+  const account = useAccount();
   const [local, setLocal] = useState<LocalGame | null>(null);
   const [home, setHome] = useState<Home>("choose");
   const [popup, setPopup] = useState<Popup>(null);
@@ -51,6 +54,9 @@ export function MessApp() {
   const clock = isOnline ? (doc?.clock ?? null) : (local?.clock ?? null);
   const over = game.status.kind !== "playing";
   const myColor: Color | null = isOnline ? online.color : null;
+  // Usernames on the clocks for online games; guests show as White/Black.
+  const nameOf = (c: Color) => doc?.names?.[c] ?? colorName(c);
+  const opponent = myColor && doc?.names?.[myColor === "w" ? "b" : "w"];
   const pendingActive = pending !== null && pending.ply === confirmed?.history.length;
 
   // Latest flag() without making the clock effect restart on every render.
@@ -155,6 +161,8 @@ export function MessApp() {
 
   const flipped = myColor === "b";
   const [topColor, bottomColor]: Color[] = flipped ? ["w", "b"] : ["b", "w"];
+  // The home popup blurs the page, but its corner buttons (account, rules, theme…) must stay usable.
+  const cornerLayer = !playing && popup === null ? "z-50" : "z-10";
   const interactive = playing && !over && !waiting && (!isOnline || (game.turn === myColor && !pendingActive));
 
   return (
@@ -168,15 +176,15 @@ export function MessApp() {
       </header>
 
       {/* Top left: chess clocks while playing (above/below the board on phones), otherwise profile / account / settings */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 sm:top-4 sm:left-4 sm:gap-2">
+      <div className={`absolute top-3 left-3 ${cornerLayer} flex items-center gap-1.5 sm:top-4 sm:left-4 sm:gap-2`}>
         {playing && clock ? (
           <div className="hidden flex-col gap-1.5 sm:flex">
-            <ClockFace color={topColor} clock={clock} now={now} />
-            <ClockFace color={bottomColor} clock={clock} now={now} />
+            <ClockFace color={topColor} clock={clock} now={now} label={nameOf(topColor)} />
+            <ClockFace color={bottomColor} clock={clock} now={now} label={nameOf(bottomColor)} />
           </div>
         ) : playing ? null : (
           <>
-            <IconButton label="Profile" onClick={() => setPopup("profile")}>
+            <IconButton label={account.profile ? `Profile: ${account.profile.username}` : "Profile"} onClick={() => setPopup("profile")}>
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
             </IconButton>
@@ -193,7 +201,7 @@ export function MessApp() {
       </div>
 
       {/* Top right: rules and menu */}
-      <div className="absolute top-3 right-3 z-10 flex gap-1.5 sm:top-4 sm:right-4 sm:gap-2">
+      <div className={`absolute top-3 right-3 ${cornerLayer} flex gap-1.5 sm:top-4 sm:right-4 sm:gap-2`}>
         <IconButton label="Rules" onClick={() => setPopup("info")}>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 11v6M12 7.5v.5" />
@@ -207,13 +215,13 @@ export function MessApp() {
       <div className="mt-10 flex flex-col items-center gap-3">
         {playing && clock && (
           <div className="self-start sm:hidden">
-            <ClockFace color={topColor} clock={clock} now={now} />
+            <ClockFace color={topColor} clock={clock} now={now} label={nameOf(topColor)} />
           </div>
         )}
         <Board game={game} onMove={move} interactive={interactive} flipped={flipped} />
         {playing && clock && (
           <div className="self-end sm:hidden">
-            <ClockFace color={bottomColor} clock={clock} now={now} />
+            <ClockFace color={bottomColor} clock={clock} now={now} label={nameOf(bottomColor)} />
           </div>
         )}
       </div>
@@ -221,6 +229,7 @@ export function MessApp() {
       {isOnline && !waiting && !over && (
         <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm text-muted">
           {game.turn === myColor ? "Your move" : "Opponent's move"} · you are {myColor && colorName(myColor)}
+          {opponent && ` · vs ${opponent}`}
         </p>
       )}
 
@@ -228,7 +237,7 @@ export function MessApp() {
       <span className="absolute bottom-3 left-4 font-math text-sm text-muted opacity-60">mess</span>
 
       {/* Bottom right: theme toggle */}
-      <div className="absolute right-4 bottom-4">
+      <div className={`absolute right-4 bottom-4 ${cornerLayer}`}>
         <ThemeToggle />
       </div>
 
@@ -373,13 +382,21 @@ export function MessApp() {
         </Modal>
       )}
 
-      {(popup === "profile" || popup === "account" || popup === "settings") && (
-        <Modal title={popup[0].toUpperCase() + popup.slice(1)} onClose={() => setPopup(null)}>
-          <p className="text-sm text-muted">
-            {popup === "settings"
-              ? "Settings are coming later."
-              : "Accounts are on the way: sign in with email to track your wins and achievements."}
-          </p>
+      {popup === "profile" && (
+        <Modal title="Profile" onClose={() => setPopup(null)}>
+          <ProfilePanel account={account} onSignIn={() => setPopup("account")} />
+        </Modal>
+      )}
+
+      {popup === "account" && (
+        <Modal title="Account" onClose={() => setPopup(null)}>
+          <AccountPanel account={account} inGame={playing && !over} />
+        </Modal>
+      )}
+
+      {popup === "settings" && (
+        <Modal title="Settings" onClose={() => setPopup(null)}>
+          <p className="text-sm text-muted">Settings are coming later.</p>
         </Modal>
       )}
 
