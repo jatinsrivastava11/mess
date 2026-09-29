@@ -39,7 +39,7 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Reverse attack lookup:** `isAttacked()` looks *outward from the target square* using each piece type's vectors, because moves are symmetric.
 - **Seeded pseudo-random numbers:** `rng.ts` (mulberry32). The same seed gives the same board, so two players can share one number instead of a whole board.
 - **Clocks without drift:** `clock.ts` never counts down with a timer. It stores *time left when the turn began* plus *when it began*, and computes `left = remaining − (now − since)`. `setInterval` only redraws the screen. Timers in browsers are unreliable (background tabs slow them down), but subtracting timestamps is always right. The same idea will keep two devices' clocks in sync online.
-- **Game trees (for Phase 2, the bot):** minimax, alpha–beta pruning, evaluation functions. See the Chess Programming Wiki.
+- **Game trees (the bot, `src/lib/bot/`):** see section 9.
 - **Graph theory:** each piece's moves form a graph on 64 squares. Knight's tours are Hamiltonian paths on the √5 graph.
 
 ---
@@ -104,7 +104,29 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Defence in depth:** client checks (nice error messages) plus server checks (the real protection) plus database rules (the last wall). Never rely on the client alone.
 - Still to add: App Check / reCAPTCHA against bots, restricting the web API key to the site's domain.
 
-## 9. Tools and workflow
+## 9. The bot: search + learning
+
+The bot has two halves: **search** (looking ahead) and **evaluation** (judging a position). Read `search.ts` and `evaluate.ts` side by side.
+
+- **Minimax / negamax:** I pick the move that's best for me assuming you reply with the move that's best for you, and so on. Negamax is the same idea written once: my score = −(your best score).
+- **Alpha–beta pruning:** skip lines that can't change the decision. With good move ordering it searches roughly the square root of the positions minimax would, so it sees about twice as deep in the same time.
+- **Move ordering:** try captures first (most valuable victim, least valuable attacker), then "killer moves" that refuted other lines at the same depth.
+- **Quiescence search:** never stop thinking in the middle of a trade. At the horizon, keep looking at captures only. Without it, bots make "horizon effect" blunders.
+- **Iterative deepening:** search depth 1, then 2, then 3… until time runs out, always keeping the last finished answer. That's how Hard thinks for "about 1.5 seconds" instead of a fixed depth.
+- **Check extensions and mate scores:** look one move deeper when in check, and score mate as a huge number minus the distance, so the bot prefers faster mates.
+- **Make/unmake on a mutable board** (`board.ts`) instead of copying the board for each move, which is much faster. Because it duplicates the rules, a test checks it against `engine.ts` in over 1,000 random positions.
+- **Bit packing:** a move is one number (`from | to << 6 | captured << 12`). Learn bitwise operators.
+- **Evaluation:** material (piece values), mobility (a piece on a square where it reaches more squares scores more), king danger (enemy attacks next to your king), and "mop-up" (when ahead, push the enemy king to the edge).
+- **Starting piece values:** each piece is worth 45 × the average number of squares it can reach. It's a guess based on mobility.
+- **Training by self-play (`scripts/train-bot.ts`):** the bot plays thousands of games against itself, saves positions with the final result, and fits the weights with **logistic regression** so the evaluation predicts who wins (Texel tuning, used by real chess engines). A first attempt used **SPSA** (nudge all weights randomly, let the two versions play, step toward the winner).
+- **What actually happened, and why it's a lesson:** neither method beat the starting guess (about 50% in 200-game checks). Measuring *how games end* showed why: 90%+ of games between careful bots end by the 50-moves-without-capture rule, even at depth 6. You can't learn who wins from games nobody wins. Always check that your training data has signal before tuning a model: look at the label distribution first.
+- **Validation discipline:** new weights are only saved if they beat the old ones in matches on boards never used in training (a train/validation split). That safeguard is why no worse weights were shipped.
+- **Measuring strength:** `npm run bot:levels` plays the levels against each other and reports wins, draws and losses, not just a score, because draws can hide differences.
+- **Difficulty levels:** Easy looks 1 move ahead and sometimes plays randomly, Medium looks 2 ahead, Hard deepens for 1.5 s. Making a bot *weaker* on purpose, in a human-feeling way, is its own design problem.
+- **Web Workers:** `bot.worker.ts` runs the search in a background thread so the page doesn't freeze.
+- Going further: transposition tables and Zobrist hashing, Monte Carlo Tree Search, and neural-network evaluation (AlphaZero, NNUE).
+
+## 10. Tools and workflow
 
 - **Git and GitHub:** small commits with clear messages, and pushes after each working step.
 - **npm:** `package.json` scripts, dependencies vs devDependencies, and peer-dependency conflicts (we hit one: vitest needed newer `@types/node`).
@@ -119,4 +141,4 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 3. React → read `Board.tsx`, then `MessApp.tsx`.
 4. CSS/Tailwind → change the colour theme in `globals.css`.
 5. SQL + Supabase → as we build accounts and online play.
-6. Algorithms → minimax for the Phase 2 bot.
+6. Algorithms → read `src/lib/bot/search.ts`, then try changing a weight and re-running `npm run bot:levels`.

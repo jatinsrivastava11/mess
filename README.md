@@ -53,7 +53,8 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [ ] Achievements
 - [ ] Bot protection (App Check / reCAPTCHA) once the site has its public address
 - [ ] Settings
-- [ ] **Phase 2:** play against a bot
+- [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. In bot-vs-bot tests each level beats the one below about 90% of the time.
+- [ ] Bot training: the self-play training pipeline is built, but it can't improve the bot yet, because most games between careful players end in 50-move draws (see NOTES).
 
 Guests play with an invisible identity. Creating an account upgrades that same identity, so a game in progress isn't lost.
 
@@ -85,6 +86,8 @@ npm run dev:online           # app + local Firebase emulators → http://localho
 npm run dev                  # app only (pass-and-play works, online needs the emulators)
 npm test                     # engine, clock and online-rules tests
 npm run build                # production build
+npm run train:bot            # self-play training (Texel tuning); only saves weights that win
+npm run bot:levels           # check Easy < Medium < Hard by bot-vs-bot matches
 ```
 
 To try online play locally, open the site in two different browsers (or one normal and one private window), create a game in one and join from the other.
@@ -108,9 +111,19 @@ src/
     game-doc.ts        an online game as stored, and the server-side rules for changing it
     server.ts          API plumbing: token check, transactions
     useOnlineGame.ts   React hook: create/join, live updates, server-synced clock
+  lib/bot/
+    board.ts           fast mutable board for searching (tested against engine.ts)
+    evaluate.ts        how good a position is: piece values, mobility, king danger
+    search.ts          alpha-beta look-ahead and the Easy/Medium/Hard levels
+    weights.ts         piece values (starting estimate: average squares reached; training overwrites)
+    bot.worker.ts      runs the bot in a background thread
   lib/account/         username/password rules, useAccount hook (sign up/in/out, verify, reset)
   lib/firebase/        Firebase setup for the browser (client.ts, api.ts) and server (admin.ts)
-    *.test.ts          tests
+  **/*.test.ts         tests, next to the code they test
+scripts/
+  arena.ts             bot-vs-bot games
+  train-bot.ts         self-play training (Texel tuning)
+  level-check.ts       matches between the levels
 ```
 
 See [NOTES.md](NOTES.md) for the concepts behind the code and what to learn next.

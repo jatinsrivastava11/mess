@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "dev:online": "firebase emulators:exec --only auth,firestore --project demo-mess \"next dev\"",
-    "emulators": "firebase emulators:start --only auth,firestore --project demo-mess"
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-mess",
+    "train:bot": "tsx scripts/train-bot.ts",
+    "bot:levels": "tsx scripts/level-check.ts"
   },
   "dependencies": {
     "firebase": "^12.19.0",
@@ -28,6 +30,7 @@
     "eslint-config-next": "16.3.6",
     "firebase-tools": "^15.31.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.2"
   }

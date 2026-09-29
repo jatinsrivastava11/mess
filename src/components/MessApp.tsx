@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type Clock, TIME_CONTROLS_MIN, type TimeControl, flagged, pressClock, startClock, stopClock } from "@/lib/game/clock";
 import { type Color, type GameState, makeMove, newGame, resign, timeout } from "@/lib/game/engine";
 import { randomSeed } from "@/lib/game/rng";
+import { askBot } from "@/lib/bot/askBot";
+import { LEVELS, type Level } from "@/lib/bot/search";
 import { useAccount } from "@/lib/account/useAccount";
 import { onlineAvailable } from "@/lib/firebase/client";
 import { CODE_LENGTH, CODE_PATTERN, replay } from "@/lib/online/game-doc";
@@ -16,12 +18,13 @@ import { Button, Modal } from "./Modal";
 import { Rules } from "./Rules";
 
 type Popup = null | "info" | "menu" | "profile" | "account" | "settings";
-type Home = "choose" | "create" | "join";
+type Home = "choose" | "create" | "join" | "bot";
 
-/** A pass-and-play game on this one device. */
+/** A game on this one device: pass-and-play, or against the bot. */
 interface LocalGame {
   game: GameState;
   clock: Clock;
+  bot?: { level: Level; color: Color };
 }
 
 const DEMO = newGame(2026); // the board behind the home popup
@@ -32,6 +35,8 @@ export function MessApp() {
   const [local, setLocal] = useState<LocalGame | null>(null);
   const [home, setHome] = useState<Home>("choose");
   const [popup, setPopup] = useState<Popup>(null);
+  const [botLevel, setBotLevel] = useState<Level>("medium");
+  const [humanSide, setHumanSide] = useState<Color | "random">("random");
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -53,9 +58,11 @@ export function MessApp() {
       : (confirmed ?? local?.game ?? DEMO);
   const clock = isOnline ? (doc?.clock ?? null) : (local?.clock ?? null);
   const over = game.status.kind !== "playing";
-  const myColor: Color | null = isOnline ? online.color : null;
-  // Usernames on the clocks for online games; guests show as White/Black.
-  const nameOf = (c: Color) => doc?.names?.[c] ?? colorName(c);
+  const bot = local?.bot;
+  const myColor: Color | null = isOnline ? online.color : bot ? (bot.color === "w" ? "b" : "w") : null;
+  // Usernames on the clocks for online games; guests show as White/Black; bot games show You vs Bot.
+  const nameOf = (c: Color) =>
+    bot ? (c === bot.color ? `Bot · ${LEVELS[bot.level].label}` : "You") : (doc?.names?.[c] ?? colorName(c));
   const opponent = myColor && doc?.names?.[myColor === "w" ? "b" : "w"];
   const pendingActive = pending !== null && pending.ply === confirmed?.history.length;
 
@@ -82,7 +89,7 @@ export function MessApp() {
           flagRef.current().catch(() => {});
         }
       } else {
-        setLocal((g) => g && { game: timeout(g.game, loser), clock: stopClock(g.clock, t) });
+        setLocal((g) => g && { ...g, game: timeout(g.game, loser), clock: stopClock(g.clock, t) });
       }
     }, 100);
     return () => clearInterval(id);
@@ -94,12 +101,38 @@ export function MessApp() {
     return () => clearTimeout(id);
   }, [error]);
 
-  function startLocal() {
+  function startLocal(withBot?: LocalGame["bot"]) {
     const t = Date.now();
-    setLocal({ game: newGame(randomSeed()), clock: startClock(minutes, t) });
+    setLocal({ game: newGame(randomSeed()), clock: startClock(minutes, t), bot: withBot });
     setNow(t);
     setPopup(null);
   }
+
+  function startBotGame() {
+    const human: Color = humanSide === "random" ? (Math.random() < 0.5 ? "w" : "b") : humanSide;
+    startLocal({ level: botLevel, color: human === "w" ? "b" : "w" });
+  }
+
+  // The bot's turn: ask it (in a background thread) and play its answer, unless the game moved on meanwhile.
+  const botToMove = Boolean(bot && local?.game.status.kind === "playing" && local.game.turn === bot.color);
+  useEffect(() => {
+    if (!botToMove || !local?.bot) return;
+    const asked = local.game;
+    let cancelled = false;
+    askBot(asked, local.bot.level).then((m) => {
+      if (cancelled || !m) return;
+      const t = Date.now();
+      setLocal((g) => {
+        if (!g || g.game !== asked) return g;
+        const next = makeMove(g.game, m.from, m.to);
+        return { ...g, game: next, clock: next.status.kind === "playing" ? pressClock(g.clock, t) : stopClock(g.clock, t) };
+      });
+      setNow(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [botToMove, local?.game, local?.bot]);
 
   function move(from: number, to: number) {
     if (isOnline && confirmed) {
@@ -114,7 +147,7 @@ export function MessApp() {
     setLocal((g) => {
       if (!g) return g;
       const next = makeMove(g.game, from, to);
-      return { game: next, clock: next.status.kind === "playing" ? pressClock(g.clock, t) : stopClock(g.clock, t) };
+      return { ...g, game: next, clock: next.status.kind === "playing" ? pressClock(g.clock, t) : stopClock(g.clock, t) };
     });
     setNow(t);
   }
@@ -154,7 +187,8 @@ export function MessApp() {
         return setError((e as Error).message);
       }
     } else {
-      setLocal((g) => g && { game: resign(g.game, g.game.turn), clock: stopClock(g.clock, Date.now()) });
+      // Against the bot you always resign for yourself; pass-and-play resigns for whoever is to move.
+      setLocal((g) => g && { ...g, game: resign(g.game, myColor ?? g.game.turn), clock: stopClock(g.clock, Date.now()) });
     }
     goHome();
   }
@@ -163,7 +197,8 @@ export function MessApp() {
   const [topColor, bottomColor]: Color[] = flipped ? ["w", "b"] : ["b", "w"];
   // The home popup blurs the page, but its corner buttons (account, rules, theme…) must stay usable.
   const cornerLayer = !playing && popup === null ? "z-50" : "z-10";
-  const interactive = playing && !over && !waiting && (!isOnline || (game.turn === myColor && !pendingActive));
+  const interactive =
+    playing && !over && !waiting && (isOnline ? game.turn === myColor && !pendingActive : !botToMove);
 
   return (
     <main className="relative flex h-dvh w-full items-center justify-center">
@@ -226,9 +261,10 @@ export function MessApp() {
         )}
       </div>
 
-      {isOnline && !waiting && !over && (
+      {(isOnline || bot) && !waiting && !over && (
         <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-sm text-muted">
-          {game.turn === myColor ? "Your move" : "Opponent's move"} · you are {myColor && colorName(myColor)}
+          {game.turn === myColor ? "Your move" : bot ? "Bot is thinking…" : "Opponent's move"} · you are{" "}
+          {myColor && colorName(myColor)}
           {opponent && ` · vs ${opponent}`}
         </p>
       )}
@@ -262,6 +298,70 @@ export function MessApp() {
               <Button variant="ghost" onClick={() => setHome("join")}>
                 Join Game
               </Button>
+              <Button variant="ghost" onClick={() => setHome("bot")}>
+                Play vs Bot
+              </Button>
+            </div>
+          )}
+          {home === "bot" && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Play vs Bot</h2>
+              <div className="space-y-2" role="radiogroup" aria-label="Bot level">
+                {(Object.keys(LEVELS) as Level[]).map((l) => (
+                  <button
+                    key={l}
+                    role="radio"
+                    aria-checked={botLevel === l}
+                    onClick={() => setBotLevel(l)}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-left transition ${
+                      botLevel === l ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
+                    }`}
+                  >
+                    <span className="block font-medium">{LEVELS[l].label}</span>
+                    <span className={`block text-xs ${botLevel === l ? "opacity-70" : "text-muted"}`}>{LEVELS[l].blurb}</span>
+                  </button>
+                ))}
+              </div>
+              <div>
+                <p className="mb-2 text-sm text-muted">You play</p>
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Your colour">
+                  {(["w", "random", "b"] as const).map((c) => (
+                    <button
+                      key={c}
+                      role="radio"
+                      aria-checked={humanSide === c}
+                      onClick={() => setHumanSide(c)}
+                      className={`rounded-xl border py-2 text-sm font-medium transition ${
+                        humanSide === c ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
+                      }`}
+                    >
+                      {c === "random" ? "Random" : colorName(c)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-sm text-muted">Time for each side</p>
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Bot time control">
+                  {TIME_CONTROLS_MIN.map((m) => (
+                    <button
+                      key={m}
+                      role="radio"
+                      aria-checked={minutes === m}
+                      onClick={() => setMinutes(m)}
+                      className={`rounded-xl border py-2 text-sm font-medium transition ${
+                        minutes === m ? "border-fg bg-fg text-bg" : "border-panel-border hover:bg-fg/5"
+                      }`}
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button onClick={startBotGame}>Start</Button>
+              <button onClick={() => setHome("choose")} className="w-full text-sm text-muted hover:text-fg">
+                Back
+              </button>
             </div>
           )}
           {home === "create" && (
@@ -288,7 +388,7 @@ export function MessApp() {
               <Button onClick={createOnline} disabled={!onlineAvailable || online.busy}>
                 {online.busy ? "Creating…" : "Create online game"}
               </Button>
-              <Button variant="ghost" onClick={startLocal}>
+              <Button variant="ghost" onClick={() => startLocal()}>
                 Play on this device
               </Button>
               {!onlineAvailable && <p className="text-xs text-muted">Online play isn&apos;t set up on this server yet.</p>}
@@ -365,7 +465,7 @@ export function MessApp() {
             {playing && !over && !waiting ? (
               <>
                 <p className="text-sm text-muted">
-                  {isOnline
+                  {isOnline || bot
                     ? "Resigning ends the game as a loss for you."
                     : `Resigning ends the game as a loss for ${colorName(game.turn)}.`}
                 </p>
