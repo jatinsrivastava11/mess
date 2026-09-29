@@ -28,6 +28,8 @@ export type Status =
   | { kind: "resigned"; winner: Color }
   | { kind: "timeout"; winner: Color }
   | { kind: "stalemate" }
+  /** 50 moves each without a capture: the bigger sum of √n on the board wins. */
+  | { kind: "points"; winner: Color; w: number; b: number }
   | { kind: "draw"; reason: "only-kings" | "no-captures" };
 
 export interface GameState {
@@ -40,8 +42,15 @@ export interface GameState {
   status: Status;
 }
 
-/** 50 moves each with no capture is a draw (there are no pawns, so captures are the only progress). */
+/**
+ * After 50 moves each with no capture the game is decided on "maths points":
+ * each side adds up √n for its pieces still on the board, and the bigger sum
+ * wins (equal sums draw). Without it, careful players could shuffle forever.
+ */
 export const QUIET_MOVE_LIMIT = 100;
+
+/** Rows each side starts with: the king plus 15 pieces on the back two rows. */
+export const ROWS_PER_SIDE = 2;
 
 export const other = (c: Color): Color => (c === "w" ? "b" : "w");
 export const rowOf = (sq: number) => Math.floor(sq / BOARD_SIZE);
@@ -51,21 +60,30 @@ const onBoard = (row: number, col: number) =>
   row >= 0 && col >= 0 && row < BOARD_SIZE && col < BOARD_SIZE;
 
 /**
- * Random starting position: each side gets a king on a random square of its
- * back row plus 7 pieces drawn from the pool (repeats allowed). The two sides
- * are drawn independently, so they are usually different.
+ * Random starting position: each side fills its back two rows with a king (on a
+ * random square of the very back row) and 15 pieces drawn from the pool
+ * (repeats allowed). The two sides are drawn independently, so they usually differ.
  */
 export function generateBoard(seed: number): Board {
   const rand = mulberry32(seed);
   const board: Board = Array(BOARD_SIZE * BOARD_SIZE).fill(null);
-  for (const [color, row] of [["b", 0], ["w", BOARD_SIZE - 1]] as const) {
+  for (const [color, back, forward] of [["b", 0, 1], ["w", BOARD_SIZE - 1, -1]] as const) {
     const kingCol = Math.floor(rand() * BOARD_SIZE);
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      const n = col === kingCol ? KING : POOL[Math.floor(rand() * POOL.length)].n;
-      board[sqAt(row, col)] = { n, color };
+    for (let r = 0; r < ROWS_PER_SIDE; r++) {
+      for (let col = 0; col < BOARD_SIZE; col++) {
+        const n = r === 0 && col === kingCol ? KING : POOL[Math.floor(rand() * POOL.length)].n;
+        board[sqAt(back + forward * r, col)] = { n, color };
+      }
     }
   }
   return board;
+}
+
+/** Maths points: the sum of √n over a side's pieces (the king doesn't count). */
+export function rootSum(board: Board, color: Color): number {
+  let sum = 0;
+  for (const p of board) if (p && p.color === color && p.n !== KING) sum += Math.sqrt(p.n);
+  return sum;
 }
 
 export function newGame(seed: number): GameState {
@@ -149,7 +167,13 @@ function statusAfter(board: Board, toMove: Color, quietMoves: number): Status {
     return inCheck(board, toMove) ? { kind: "checkmate", winner: other(toMove) } : { kind: "stalemate" };
   }
   if (board.every((p) => !p || p.n === KING)) return { kind: "draw", reason: "only-kings" };
-  if (quietMoves >= QUIET_MOVE_LIMIT) return { kind: "draw", reason: "no-captures" };
+  if (quietMoves >= QUIET_MOVE_LIMIT) {
+    const w = rootSum(board, "w");
+    const b = rootSum(board, "b");
+    // Sums of square roots are compared with a tolerance: floating point can't represent them exactly.
+    if (Math.abs(w - b) < 1e-9) return { kind: "draw", reason: "no-captures" };
+    return { kind: "points", winner: w > b ? "w" : "b", w, b };
+  }
   return { kind: "playing" };
 }
 

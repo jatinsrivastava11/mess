@@ -7,16 +7,19 @@
 ## How it plays
 
 - **Board:** a standard 8×8 board.
-- **Setup:** each player gets their king and **7 random pieces** on their back row. The two sides are drawn *independently*, so no two games (or armies) are alike.
+- **Setup:** each player fills their back two rows: the king (on the back row) and **15 random pieces**. The two sides are drawn *independently*, so no two games (or armies) are alike.
 - **Movement:** a piece √n is the hypotenuse of a right triangle with whole-number sides a, b ≥ 1 (a² + b² = n). It **jumps** like a knight: a squares one way, b the other. Pieces in between never block it.
 - **Equal sides move straight:** when a = b (√2, √8, √18, √32), the piece jumps a squares in a straight line (up, down, left or right). √2 steps 1, √8 jumps 2, and so on.
 - If n can be split into two squares in more than one way, the piece gets every split. This only happens on bigger boards: √50 = 1² + 7² = 5² + 5².
 - **The king** is **1** (drawn with a crown). It steps one square in any direction, like a chess king.
 - **Capturing:** land on an enemy piece. You can't land on your own.
 - **Check:** you may never leave your own king under attack.
-- **Winning:** checkmate the opponent's king, or they resign.
+- **Winning:** checkmate the opponent's king, or they resign or run out of time.
+- **Maths points:** after 50 moves each with no capture, each side adds up √n for its pieces on the board (the king doesn't count), and the bigger sum wins. A counter appears as the limit approaches.
 - **Clock:** each player has their own clock (3, 5 or 10 minutes). Only the player to move loses time. If your clock hits zero, you lose.
-- **Draws:** stalemate (no legal move but not in check), only the two kings left, or 50 moves each with no capture.
+- **Draws:** stalemate (no legal move but not in check), only the two kings left, or exactly equal maths points.
+
+**Why these rules?** With the first version (8 pieces each, a draw after 50 quiet moves), bot-vs-bot tests showed 97% of games were draws: jumping pieces make it easy to dodge forever. Testing alternatives showed 16 pieces gives real checkmates in about half of games, and maths points settles the rest: now about 62% end in checkmate and under 3% are drawn.
 
 ## The pieces
 
@@ -58,8 +61,7 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [ ] Elo rating
 - [ ] Bot protection (App Check / reCAPTCHA) once the site has its public address
 - [ ] Settings
-- [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. In bot-vs-bot tests each level beats the one below about 90% of the time.
-- [ ] Bot training: the self-play training pipeline is built, but it can't improve the bot yet, because most games between careful players end in 50-move draws (see NOTES).
+- [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. Its piece values were learned by self-play (the trained bot beats the untrained one 58% of the time), and it knows the maths-points rule.
 
 Guests play with an invisible identity. Creating an account upgrades that same identity, so a game in progress isn't lost.
 
@@ -120,7 +122,7 @@ src/
     board.ts           fast mutable board for searching (tested against engine.ts)
     evaluate.ts        how good a position is: piece values, mobility, king danger
     search.ts          alpha-beta look-ahead and the Easy/Medium/Hard levels
-    weights.ts         piece values (starting estimate: average squares reached; training overwrites)
+    weights.ts         piece values learned by self-play training
     bot.worker.ts      runs the bot in a background thread
   lib/account/         username/password rules, useAccount hook (sign up/in/out, verify, reset)
   lib/firebase/        Firebase setup for the browser (client.ts, api.ts) and server (admin.ts)

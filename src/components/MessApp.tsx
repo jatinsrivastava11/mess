@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Clock, TIME_CONTROLS_MIN, type TimeControl, flagged, pressClock, startClock, stopClock } from "@/lib/game/clock";
-import { type Color, type GameState, makeMove, newGame, resign, timeout } from "@/lib/game/engine";
+import {
+  type Color,
+  type GameState,
+  QUIET_MOVE_LIMIT,
+  makeMove,
+  newGame,
+  resign,
+  rootSum,
+  timeout,
+} from "@/lib/game/engine";
 import { randomSeed } from "@/lib/game/rng";
 import { askBot } from "@/lib/bot/askBot";
 import { LEVELS, type Level } from "@/lib/bot/search";
@@ -406,6 +415,13 @@ export function MessApp() {
               {hints && " · hints on"}
             </p>
           )}
+          {/* Shown only as the no-capture limit gets close, so the points rule is never a surprise. */}
+          {!reviewing && !over && game.quietMoves >= QUIET_MOVE_LIMIT - 40 && (
+            <p className="font-medium text-accent" title="At 50 moves each without a capture, the bigger sum of √n wins">
+              {Math.ceil((QUIET_MOVE_LIMIT - game.quietMoves) / 2)} moves to points · White{" "}
+              {rootSum(game.board, "w").toFixed(1)} – Black {rootSum(game.board, "b").toFixed(1)}
+            </p>
+          )}
           {over && resultHidden && (
             <button onClick={goHome} className="rounded-lg px-2 py-1 text-accent hover:bg-fg/10">
               Game over · back to home
@@ -691,7 +707,7 @@ export function MessApp() {
 
 function resultTitle(g: GameState, me: Color | null) {
   const s = g.status;
-  if (s.kind === "checkmate" || s.kind === "resigned" || s.kind === "timeout") {
+  if ("winner" in s) {
     if (me) return s.winner === me ? "You win!" : "You lose";
     return `${colorName(s.winner)} wins`;
   }
@@ -709,8 +725,10 @@ function resultDetail(g: GameState) {
       return `${colorName(s.winner === "w" ? "b" : "w")} ran out of time`;
     case "stalemate":
       return "Stalemate";
+    case "points":
+      return `50 moves without a capture: maths points ${s.w.toFixed(2)} (White) vs ${s.b.toFixed(2)} (Black)`;
     case "draw":
-      return s.reason === "only-kings" ? "Only the kings are left" : "50 moves each without a capture";
+      return s.reason === "only-kings" ? "Only the kings are left" : "50 moves without a capture, and maths points are exactly equal";
     default:
       return "";
   }

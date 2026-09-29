@@ -65,7 +65,7 @@ for (let i = 0; i < GAMES; i++) {
     g = makeMove(g, moveFrom(m), moveTo(m));
   }
   const s = g.status;
-  const result = s.kind === "checkmate" ? (s.winner === "w" ? 1 : 0) : 0.5;
+  const result = "winner" in s ? (s.winner === "w" ? 1 : 0) : 0.5; // checkmate or maths points
   if (result !== 0.5) decisive++;
   // Up to 12 positions per game, spread out, so long games don't dominate.
   const step = Math.max(1, Math.floor(positions.length / 12));

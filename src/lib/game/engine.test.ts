@@ -7,6 +7,8 @@ import {
   legalTargets,
   makeMove,
   newGame,
+  QUIET_MOVE_LIMIT,
+  rootSum,
   squareName,
 } from "./engine";
 import { KING, POOL, computePool, pieceDef } from "./pieces";
@@ -54,15 +56,20 @@ describe("piece pool", () => {
 });
 
 describe("board generation", () => {
-  it("is deterministic per seed and gives each side one king plus 7 pieces", () => {
+  it("is deterministic per seed and gives each side one king plus 15 pieces on its back two rows", () => {
     const a = generateBoard(42);
     expect(generateBoard(42)).toEqual(a);
     for (const color of ["w", "b"] as const) {
       const mine = a.filter((p) => p?.color === color);
-      expect(mine).toHaveLength(8);
+      expect(mine).toHaveLength(16);
       expect(mine.filter((p) => p!.n === KING)).toHaveLength(1);
     }
-    expect(a.slice(8, 56).every((p) => p === null)).toBe(true);
+    expect(a.slice(0, 16).every((p) => p?.color === "b")).toBe(true);
+    expect(a.slice(48, 64).every((p) => p?.color === "w")).toBe(true);
+    expect(a.slice(16, 48).every((p) => p === null)).toBe(true);
+    // Kings start on the very back row.
+    expect(a.findIndex((p) => p?.n === KING && p.color === "b")).toBeLessThan(8);
+    expect(a.findIndex((p) => p?.n === KING && p.color === "w")).toBeGreaterThanOrEqual(56);
   });
 
   it("never starts in check", () => {
@@ -115,6 +122,25 @@ describe("moves", () => {
     const after = makeMove(g, sq("h1"), sq("h2"));
     expect(inCheck(after.board, "b")).toBe(false);
     expect(after.status).toEqual({ kind: "stalemate" });
+  });
+
+  it("decides on maths points after 50 moves each without a capture", () => {
+    // White: √5 + √2 ≈ 3.65. Black: 5 = √25 = 5. Black has more points.
+    const g = { ...position({ a1: "w1", c3: "w5", h1: "w2", h8: "b1", a8: "b25" }), quietMoves: QUIET_MOVE_LIMIT - 1 };
+    const after = makeMove(g, sq("a1"), sq("a2"));
+    expect(after.status).toMatchObject({ kind: "points", winner: "b" });
+    if (after.status.kind === "points") expect(after.status.b).toBeCloseTo(5);
+  });
+
+  it("draws on equal maths points", () => {
+    const g = { ...position({ a1: "w1", c3: "w5", h8: "b1", a6: "b5" }), quietMoves: QUIET_MOVE_LIMIT - 1 };
+    expect(makeMove(g, sq("a1"), sq("a2")).status).toEqual({ kind: "draw", reason: "no-captures" });
+  });
+
+  it("adds up √n for each side, ignoring the king", () => {
+    const g = position({ a1: "w1", b1: "w2", c1: "w8", h8: "b1" });
+    expect(rootSum(g.board, "w")).toBeCloseTo(Math.SQRT2 + Math.sqrt(8));
+    expect(rootSum(g.board, "b")).toBe(0);
   });
 
   it("declares a draw when only kings remain", () => {

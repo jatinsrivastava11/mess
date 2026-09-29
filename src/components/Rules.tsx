@@ -45,7 +45,10 @@ export function Rules() {
       <section>
         <h3 className="mb-1 font-semibold">Rules</h3>
         <ul className="list-disc space-y-1 pl-5">
-          <li>8×8 board. Each player gets their king and 7 random pieces on their back row. The two sides are drawn separately.</li>
+          <li>
+            8×8 board. Each player fills their back two rows with their king (on the back row) and 15 random pieces. The two
+            sides are drawn separately.
+          </li>
           <li>White moves first. All pieces <b>jump</b>, so pieces in between never block them.</li>
           <li>Land on an enemy piece to capture it. You can&apos;t land on your own pieces.</li>
           <li>
@@ -54,7 +57,11 @@ export function Rules() {
           </li>
           <li><b>Checkmate</b>: the king is attacked and has no escape. That player loses.</li>
           <li><b>Stalemate</b>: the player to move has no legal move but isn&apos;t in check. It&apos;s a draw.</li>
-          <li>It is also a draw when only the two kings are left, or after 50 moves each with no capture.</li>
+          <li>
+            <b>Maths points</b>: after 50 moves each with no capture, each side adds up √n for its pieces on the board (the
+            king doesn&apos;t count). The bigger sum wins. A counter appears as the limit gets close.
+          </li>
+          <li>It&apos;s a draw only if the two kings are the last pieces left, or the maths points are exactly equal.</li>
           <li>Resigning loses the game. Use the flag next to your clock (tap twice).</li>
           <li>
             <b>No move hints</b> after your first game: you calculate every move yourself. Want dots back? Play a{" "}

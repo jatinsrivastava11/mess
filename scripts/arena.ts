@@ -17,7 +17,7 @@ export const searcher =
  * Plays one game and returns White's score (1 win, 0.5 draw, 0 loss). Games
  * still running after `maxPlies` are judged by `judge` (a clear material lead wins).
  */
-export function playGame(seed: number, white: Player, black: Player, judge: Tables, maxPlies = 160): number {
+export function playGame(seed: number, white: Player, black: Player, judge: Tables, maxPlies = 300): number {
   let g = newGame(seed);
   for (let ply = 0; ply < maxPlies && g.status.kind === "playing"; ply++) {
     const m = (g.turn === "w" ? white : black)(g);
@@ -25,7 +25,7 @@ export function playGame(seed: number, white: Player, black: Player, judge: Tabl
     g = makeMove(g, m.from, m.to);
   }
   const s = g.status;
-  if (s.kind === "checkmate") return s.winner === "w" ? 1 : 0;
+  if ("winner" in s) return s.winner === "w" ? 1 : 0; // checkmate, maths points, resignation or time
   if (s.kind !== "playing") return 0.5;
   const pos = fromBoard(g.board, g.turn);
   const whiteView = evaluate(pos, judge) * pos.side;

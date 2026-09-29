@@ -64,6 +64,14 @@ describe("bot search", () => {
     expect(moveTo(r.move)).not.toBe(sq("e6"));
   });
 
+  it("plays for maths points at the no-capture limit", () => {
+    // One quiet move from the limit. White is ahead on points (√5+√13 vs √2), so any quiet move wins on points;
+    // the bot must see that as a win, not a neutral position.
+    const g = { ...position({ a1: "w1", c3: "w5", e3: "w13", h8: "b1", h6: "b2" }), quietMoves: 99 };
+    const r = bestMove(fromBoard(g.board, "w"), tables, { maxDepth: 2, quiet: 99 });
+    expect(r.score).toBeGreaterThan(90_000);
+  });
+
   it("every level returns a legal move", () => {
     const g = newGame(123);
     const legal = engineMoves(g);

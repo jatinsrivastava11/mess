@@ -2,8 +2,9 @@
 // captures, check extensions and iterative deepening. The three levels share
 // it and differ in how far they look and how often they "misjudge".
 
-import type { GameState } from "../game/engine";
+import { type GameState, QUIET_MOVE_LIMIT } from "../game/engine";
 import {
+  N_OF_CODE,
   type Position,
   attacked,
   fromBoard,
@@ -25,6 +26,22 @@ export type Level = "easy" | "medium" | "hard";
 export const MATE = 1_000_000;
 const INF = 10_000_000;
 const MAX_PLY = 32;
+/** Winning on maths points is good, but always worse than a checkmate. */
+const POINTS_WIN = 100_000;
+const ROOT_OF_CODE = N_OF_CODE.map((n, code) => (code <= 1 ? 0 : Math.sqrt(n)));
+
+/** The maths-points result if the no-capture limit is reached here, from the side to move's view. */
+function pointsResult(pos: Position): number {
+  let diff = 0;
+  for (let s = 0; s < 64; s++) {
+    const v = pos.sq[s];
+    if (v > 0) diff += ROOT_OF_CODE[v];
+    else if (v < 0) diff -= ROOT_OF_CODE[-v];
+  }
+  diff *= pos.side;
+  if (Math.abs(diff) < 1e-9) return 0;
+  return diff > 0 ? POINTS_WIN + Math.round(diff * 100) : -POINTS_WIN + Math.round(diff * 100);
+}
 
 interface Ctx {
   pos: Position;
@@ -74,9 +91,10 @@ function quiesce(ctx: Ctx, alpha: number, beta: number, depth: number): number {
   return alpha;
 }
 
-function negamax(ctx: Ctx, depth: number, alpha: number, beta: number, ply: number): number {
+function negamax(ctx: Ctx, depth: number, alpha: number, beta: number, ply: number, quiet: number): number {
   if (timeUp(ctx)) return 0;
   const { pos } = ctx;
+  if (quiet >= QUIET_MOVE_LIMIT) return pointsResult(pos);
   const side = pos.side;
   const checked = inCheck(pos, side);
   if (checked && ply < MAX_PLY - 2) depth++; // look deeper when in check, so mates aren't missed
@@ -92,7 +110,7 @@ function negamax(ctx: Ctx, depth: number, alpha: number, beta: number, ply: numb
       continue;
     }
     legal++;
-    const score = -negamax(ctx, depth - 1, -beta, -alpha, ply + 1);
+    const score = -negamax(ctx, depth - 1, -beta, -alpha, ply + 1, moveCaptured(m) ? 0 : quiet + 1);
     unmakeMove(pos, m);
     if (ctx.stopped) return 0;
     if (score > best) best = score;
@@ -118,18 +136,23 @@ export interface Scored {
 }
 
 /** Scores every root move with a full window at a fixed depth (used by easy/medium, which choose among them). */
-export function scoreAll(pos: Position, t: Tables, depth: number): Scored[] {
+export function scoreAll(pos: Position, t: Tables, depth: number, quiet = 0): Scored[] {
   const ctx: Ctx = { pos, t, nodes: 0, deadline: Infinity, stopped: false, killers: [] };
   return legalMoves(pos).map((move) => {
     makeMove(pos, move);
-    const score = -negamax(ctx, depth - 1, -INF, INF, 1);
+    const score = -negamax(ctx, depth - 1, -INF, INF, 1, moveCaptured(move) ? 0 : quiet + 1);
     unmakeMove(pos, move);
     return { move, score };
   });
 }
 
 /** Iterative deepening: search depth 1, 2, 3, … until time or maxDepth runs out, keeping the last finished answer. */
-export function bestMove(pos: Position, t: Tables, opts: { timeMs?: number; maxDepth?: number }): Scored & { depth: number } {
+export function bestMove(
+  pos: Position,
+  t: Tables,
+  opts: { timeMs?: number; maxDepth?: number; quiet?: number },
+): Scored & { depth: number } {
+  const quiet = opts.quiet ?? 0;
   const ctx: Ctx = {
     pos,
     t,
@@ -145,7 +168,7 @@ export function bestMove(pos: Position, t: Tables, opts: { timeMs?: number; maxD
     const scores = new Map<number, number>();
     for (const m of rootMoves) {
       makeMove(pos, m);
-      const score = -negamax(ctx, depth - 1, -INF, -alpha, 1);
+      const score = -negamax(ctx, depth - 1, -INF, -alpha, 1, moveCaptured(m) ? 0 : quiet + 1);
       unmakeMove(pos, m);
       if (ctx.stopped) break;
       scores.set(m, score);
@@ -183,12 +206,12 @@ export function chooseMove(
   if (moves.length === 0) return null;
   const pick = (m: number) => ({ from: moveFrom(m), to: moveTo(m) });
 
-  if (level === "hard") return pick(bestMove(pos, tables, { timeMs: 1500 }).move);
+  if (level === "hard") return pick(bestMove(pos, tables, { timeMs: 1500, quiet: game.quietMoves }).move);
 
   const depth = level === "easy" ? 1 : 2;
   const margin = level === "easy" ? 150 : 25; // how much worse than best a move may be and still be chosen
   if (level === "easy" && rand() < 0.2) return pick(moves[Math.floor(rand() * moves.length)]);
-  const scored = scoreAll(pos, tables, depth);
+  const scored = scoreAll(pos, tables, depth, game.quietMoves);
   const top = Math.max(...scored.map((s) => s.score));
   const good = scored.filter((s) => s.score >= top - margin);
   return pick(good[Math.floor(rand() * good.length)].move);
