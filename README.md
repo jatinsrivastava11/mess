@@ -82,7 +82,7 @@ Needs Node 20+ and, for online play, Java 21+ (the Firebase emulators run on it)
 ```bash
 npm install
 cp .env.example .env.local   # emulator settings, no real Firebase needed
-npm run dev:online           # app + local Firebase emulators → http://localhost:3000
+npm run dev:online           # app + local Firebase emulators → http://localhost:3100
 npm run dev                  # app only (pass-and-play works, online needs the emulators)
 npm test                     # engine, clock and online-rules tests
 npm run build                # production build
