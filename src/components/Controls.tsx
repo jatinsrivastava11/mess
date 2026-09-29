@@ -21,7 +21,7 @@ export function ClockFace({ color, clock, now, label }: { color: Color; clock: C
     <div
       className={`flex min-w-32 items-center justify-between gap-3 rounded-xl border px-3 py-1.5 shadow-sm transition ${
         active ? "border-fg bg-fg text-bg" : "border-panel-border bg-panel text-muted"
-      }`}
+      } ${low && active ? "animate-pulse" : ""}`}
       aria-label={`${colorName(color)} clock`}
     >
       <span className="flex items-center gap-1.5 text-xs font-medium">

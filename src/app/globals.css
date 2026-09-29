@@ -2,11 +2,25 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+/*
+ * Visual rule: "a sheet of maths". The board is the equation, pieces are
+ * numbers, everything else is a margin note. Three looks share one set of
+ * variables; each has a light and a dark version. A look applies to whatever
+ * element carries data-look (the page, or a small preview in Settings).
+ */
+
+/* ---- Classic: warm paper and slate ---- */
+:root,
+[data-look="classic"] {
+  --bg-pattern: linear-gradient(transparent, transparent);
+  --display-font: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --piece-w-ring: transparent;
+  --piece-b-ring: transparent;
+  --piece-glow: none;
   --bg: #f4f1ea;
   --bg-glow: #ffffff;
   --fg: #1d2129;
-  --muted: #6b7280;
+  --muted: #5b6270;
   --panel: rgba(255, 255, 255, 0.82);
   --panel-border: rgba(29, 33, 41, 0.12);
   --accent: #c2410c;
@@ -23,7 +37,8 @@
   --piece-b-fg: #f4f1ea;
 }
 
-.dark {
+.dark,
+.dark [data-look="classic"] {
   --bg: #0f1216;
   --bg-glow: #1b212b;
   --fg: #e8e6e1;
@@ -41,6 +56,101 @@
   --piece-b-fg: #f4f1ea;
 }
 
+/* ---- Chalkboard: a green board on a classroom wall (light) or at night (dark) ---- */
+[data-look="chalk"] {
+  --bg-pattern: linear-gradient(transparent, transparent);
+  --display-font: var(--font-caveat), "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --bg: #e7e1d3;
+  --bg-glow: #f3efe5;
+  --fg: #22302a;
+  --muted: #4c5a52;
+  --panel: rgba(250, 247, 240, 0.88);
+  --panel-border: rgba(34, 48, 42, 0.16);
+  --accent: #b45309;
+  --sq-light: #3d5c4a;
+  --sq-dark: #2e4839;
+  --sq-frame: #8b6a45;
+  --hint: rgba(244, 241, 232, 0.45);
+  --select: rgba(242, 212, 121, 0.4);
+  --last: rgba(242, 212, 121, 0.22);
+  --check: rgba(239, 68, 68, 0.55);
+  --piece-w-bg: rgba(255, 255, 255, 0.06);
+  --piece-w-fg: #f7f5ee;
+  --piece-w-ring: #f7f5ee;
+  /* Sides differ by fill as well as colour (outlined vs solid), so colourblind players can tell them apart. */
+  --piece-b-bg: #f5d77f;
+  --piece-b-fg: #1f3328;
+  --piece-b-ring: #f5d77f;
+  --piece-glow: 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.dark[data-look="chalk"],
+.dark [data-look="chalk"] {
+  --bg: #0f1612;
+  --bg-glow: #1a2620;
+  --fg: #e9efe9;
+  --muted: #9fb2a6;
+  --panel: rgba(22, 32, 27, 0.9);
+  --panel-border: rgba(233, 239, 233, 0.12);
+  --accent: #f5d77f;
+  --sq-frame: #4a3a28;
+}
+
+/* ---- Blueprint: graph paper and ink (light), navy blueprint (dark) ---- */
+[data-look="blueprint"] {
+  --bg-pattern:
+    linear-gradient(rgba(30, 58, 138, 0.07) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, rgba(30, 58, 138, 0.07) 1px, transparent 1px) 0 0 / 16px 16px;
+  --display-font: var(--font-geist-mono), monospace;
+  --bg: #f7f9fc;
+  --bg-glow: #ffffff;
+  --fg: #172554;
+  --muted: #52618a;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(23, 37, 84, 0.16);
+  --accent: #c2410c;
+  --sq-light: #ffffff;
+  --sq-dark: #d6e4f5;
+  --sq-frame: #1e3a8a;
+  --hint: rgba(30, 58, 138, 0.35);
+  --select: rgba(194, 65, 12, 0.28);
+  --last: rgba(194, 65, 12, 0.14);
+  --check: rgba(220, 38, 38, 0.45);
+  --piece-w-bg: #ffffff;
+  --piece-w-fg: #1e3a8a;
+  --piece-w-ring: #1e3a8a;
+  --piece-b-bg: #1e3a8a;
+  --piece-b-fg: #ffffff;
+  --piece-b-ring: #1e3a8a;
+  --piece-glow: none;
+}
+
+.dark[data-look="blueprint"],
+.dark [data-look="blueprint"] {
+  --bg-pattern:
+    linear-gradient(rgba(224, 240, 255, 0.06) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, rgba(224, 240, 255, 0.06) 1px, transparent 1px) 0 0 / 16px 16px;
+  --bg: #0b2545;
+  --bg-glow: #13315c;
+  --fg: #e0f0ff;
+  --muted: #8da9c4;
+  --panel: rgba(11, 37, 69, 0.92);
+  --panel-border: rgba(224, 240, 255, 0.16);
+  --accent: #ffb703;
+  --sq-light: #174072;
+  --sq-dark: #0f2f57;
+  --sq-frame: #8da9c4;
+  --hint: rgba(224, 240, 255, 0.4);
+  --select: rgba(255, 183, 3, 0.35);
+  --last: rgba(255, 183, 3, 0.18);
+  --piece-w-bg: #0b2545;
+  --piece-w-fg: #e0f0ff;
+  --piece-w-ring: #e0f0ff;
+  --piece-b-bg: #8ecae6;
+  --piece-b-fg: #0b2545;
+  --piece-b-ring: #8ecae6;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-fg: var(--fg);
@@ -51,6 +161,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-math: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-display: var(--display-font);
 }
 
 html,
@@ -59,7 +170,9 @@ body {
 }
 
 body {
-  background: radial-gradient(ellipse at 50% 30%, var(--bg-glow), var(--bg) 70%);
+  background:
+    var(--bg-pattern),
+    radial-gradient(ellipse at 50% 30%, var(--bg-glow), var(--bg) 70%);
   background-color: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -93,4 +206,23 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Popups ease in (switched off by the reduce-motion rule above). */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.animate-pop-in {
+  animation: pop-in 180ms ease-out;
+}
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
 }

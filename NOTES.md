@@ -79,6 +79,10 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **CSS Grid:** the board is `grid-cols-8 grid-rows-8`. Without `grid-rows-8`, rows grew to fit their content and weren't square (a real bug found while building).
 - **Responsive sizing:** `w-[min(76vh,94vw)]` makes the board as big as fits. `sm:` prefixes switch layout at 640px wide. On phones the clocks move from the top-left corner to above and below the board.
 - **Accessibility:** `aria-label`s on icon buttons and squares, `role="dialog"`, and closing popups with Escape.
+- **A visual rule (art-bible method, from Claude Code Game Studios):** "a sheet of maths: the board is the equation, pieces are numbers, everything else is a margin note." One sentence like this settles design arguments. Principles: the board is the game (other things appear only when relevant), numbers are the art, calm until it matters.
+- **Theming with CSS variables:** each look (`[data-look="chalk"]` and so on) only redefines variables such as `--sq-light` and `--piece-b-bg`. Because the selector matches any element, the Settings previews can show a different look than the page (see `LookPicker.tsx`).
+- **Contrast is measurable:** WCAG contrast ratio = (L1 + 0.05) / (L2 + 0.05), using relative luminance. Aim for 4.5:1 or more for text. The looks were tested this way in a real browser, and it caught grey text at 4.29:1, which was then fixed. The test itself had a bug at first: it didn't understand `#fff` or `#ffffff0f` colours. Test your tests.
+- **Never colour alone:** in Chalkboard, White's and Black's chalk colours are similar in brightness, which is hard for colourblind players. So Black's pieces are filled and White's are outlined. Check is announced in words, and the low clock pulses as well as turning red.
 - **Avoiding a theme flash:** a tiny inline script in `layout.tsx` sets dark mode *before* React loads.
 
 ---

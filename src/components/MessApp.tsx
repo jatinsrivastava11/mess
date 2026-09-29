@@ -6,6 +6,7 @@ import {
   type Color,
   type GameState,
   QUIET_MOVE_LIMIT,
+  inCheck,
   makeMove,
   newGame,
   resign,
@@ -22,6 +23,7 @@ import { useOnlineGame } from "@/lib/online/useOnlineGame";
 import { AccountPanel, ProfilePanel } from "./AccountPanels";
 import { Board } from "./Board";
 import { ClockFace, IconButton, ResignFlag, ThemeToggle, colorName } from "./Controls";
+import { LookPicker } from "./LookPicker";
 import { Logo } from "./Logo";
 import { Button, Modal } from "./Modal";
 import { Rules } from "./Rules";
@@ -309,7 +311,7 @@ export function MessApp() {
       <header className="spotlight pointer-events-none absolute inset-x-0 top-0 flex h-28 justify-center pt-3">
         <div className="flex h-9 items-center gap-2 sm:h-10">
           <Logo className="h-6 w-6 sm:h-8 sm:w-8" />
-          <h1 className="font-math text-2xl font-bold tracking-tight sm:text-3xl">mess</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">mess</h1>
         </div>
       </header>
 
@@ -413,6 +415,12 @@ export function MessApp() {
               {myColor && colorName(myColor)}
               {opponent && ` · vs ${opponent}`}
               {hints && " · hints on"}
+            </p>
+          )}
+          {/* Check is announced in words, not only by the red square. */}
+          {!reviewing && !over && inCheck(game.board, game.turn) && (
+            <p className="font-semibold text-red-600 dark:text-red-400" role="status">
+              Check! {myColor ? (game.turn === myColor ? "Your king must escape." : "Their king is in check.") : `${colorName(game.turn)}'s king must escape.`}
             </p>
           )}
           {/* Shown only as the no-capture limit gets close, so the points rule is never a surprise. */}
@@ -665,8 +673,12 @@ export function MessApp() {
       )}
 
       {popup === "settings" && (
-        <Modal title="Settings" onClose={() => setPopup(null)}>
-          <p className="text-sm text-muted">Settings are coming later.</p>
+        <Modal title="Settings" onClose={() => setPopup(null)} wide>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Look</h3>
+            <LookPicker />
+            <p className="text-xs text-muted">Light or dark is the switch in the bottom-right corner. Each look has both.</p>
+          </div>
         </Modal>
       )}
 

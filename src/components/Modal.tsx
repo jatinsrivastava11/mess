@@ -23,14 +23,14 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/25 p-4 backdrop-blur-md"
+      className="animate-fade-in fixed inset-0 z-40 flex items-center justify-center bg-black/25 p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-panel-border bg-panel p-6 shadow-2xl ${
+        className={`animate-pop-in relative max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-panel-border bg-panel p-6 shadow-2xl ${
           wide ? "max-w-2xl" : "max-w-sm"
         }`}
         onClick={(e) => e.stopPropagation()}

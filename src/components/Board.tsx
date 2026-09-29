@@ -93,6 +93,9 @@ export function Board({
                 style={{
                   background: piece.color === "w" ? "var(--piece-w-bg)" : "var(--piece-b-bg)",
                   color: piece.color === "w" ? "var(--piece-w-fg)" : "var(--piece-b-fg)",
+                  // Outlined pieces in the Chalkboard and Blueprint looks; transparent in Classic.
+                  border: `2px solid ${piece.color === "w" ? "var(--piece-w-ring)" : "var(--piece-b-ring)"}`,
+                  textShadow: "var(--piece-glow)",
                   boxShadow: piece.n === 1 ? "0 0 0 2px var(--accent), 0 3px 6px rgba(0,0,0,.35)" : undefined,
                   transform: sq === selected ? "scale(1.08)" : undefined,
                 }}
