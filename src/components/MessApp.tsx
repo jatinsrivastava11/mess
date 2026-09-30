@@ -311,7 +311,9 @@ export function MessApp() {
       <header className="spotlight pointer-events-none absolute inset-x-0 top-0 flex h-28 justify-center pt-3">
         <div className="flex h-9 items-center gap-2 sm:h-10">
           <Logo className="h-6 w-6 sm:h-8 sm:w-8" />
-          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">mess</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl" style={{ textShadow: "var(--title-glow)" }}>
+            mess
+          </h1>
         </div>
       </header>
 

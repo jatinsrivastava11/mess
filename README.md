@@ -53,7 +53,7 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [x] **No move hints** after your first game ever (it opens with a notice explaining this); **Tutorial** games vs the bot bring the dots back. Illegal tries get a message.
 - [x] **Move review:** ← → (or ◀ ▶) step through earlier positions without changing the game; Home/End jump to the start/live position
 - [x] **Resign** with the flag next to your clock (two taps to confirm)
-- [x] **Three looks** (Settings): Classic, Chalkboard and Blueprint, each with light and dark. All pass WCAG AA contrast (4.5:1 or better), and the two sides differ by fill as well as colour for colourblind players.
+- [x] **Four looks** (Settings): **Neon** (the default: a glowing glass board seen from above), Classic, Chalkboard and Blueprint, each with light and dark. All pass WCAG AA contrast (4.5:1 or better), and the two sides differ by fill as well as colour for colourblind players.
 - [x] Keyboard focus outlines, reduced-motion support, "Check!" said in words, and a pulsing clock under 20 seconds
 - [x] Phone layout: board fills the width, clocks sit above and below it
 - [x] **Accounts:** email + password with a unique username. Guests can still play; accounts save wins.

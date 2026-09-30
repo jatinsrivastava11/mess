@@ -20,8 +20,18 @@ export function ClockFace({ color, clock, now, label }: { color: Color; clock: C
   return (
     <div
       className={`flex min-w-32 items-center justify-between gap-3 rounded-xl border px-3 py-1.5 shadow-sm transition ${
-        active ? "border-fg bg-fg text-bg" : "border-panel-border bg-panel text-muted"
+        active ? "" : "border-panel-border bg-panel text-muted"
       } ${low && active ? "animate-pulse" : ""}`}
+      style={
+        active
+          ? {
+              background: "var(--clock-on-bg)",
+              color: "var(--clock-on-fg)",
+              borderColor: "var(--clock-on-border)",
+              boxShadow: "var(--clock-on-glow)",
+            }
+          : undefined
+      }
       aria-label={`${colorName(color)} clock`}
     >
       <span className="flex items-center gap-1.5 text-xs font-medium">

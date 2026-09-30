@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Caveat, Geist, Geist_Mono } from "next/font/google";
+import { Caveat, Geist, Geist_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -9,6 +9,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// Futuristic lettering for the Neon look's title.
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
   subsets: ["latin"],
 });
 
@@ -24,11 +30,12 @@ export const metadata: Metadata = {
 };
 
 // Applies the saved light/dark theme and look before the page paints, so nothing flashes.
-const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("mess-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))d.classList.add("dark");var l=localStorage.getItem("mess-look");if(l==="chalk"||l==="blueprint")d.setAttribute("data-look",l)}catch(e){}`;
+// New visitors get the Neon look in dark mode.
+const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("mess-theme");if(t!=="light")d.classList.add("dark");var l=localStorage.getItem("mess-look");d.setAttribute("data-look",l==="classic"||l==="chalk"||l==="blueprint"?l:"neon")}catch(e){d.classList.add("dark");d.setAttribute("data-look","neon")}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} ${orbitron.variable} antialiased`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

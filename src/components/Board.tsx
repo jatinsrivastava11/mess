@@ -46,7 +46,8 @@ export function Board({
 
   return (
     <div
-      className="grid aspect-square w-[min(76vh,94vw)] grid-cols-8 grid-rows-8 overflow-hidden rounded-lg shadow-2xl ring-4 ring-[var(--sq-frame)]"
+      className="grid aspect-square w-[min(76vh,94vw)] grid-cols-8 grid-rows-8 overflow-hidden rounded-lg"
+      style={{ boxShadow: "var(--board-shadow)" }}
       role="grid"
       aria-label="mess board"
     >
@@ -73,7 +74,11 @@ export function Board({
             key={sq}
             onClick={() => click(sq)}
             className="relative flex min-h-0 min-w-0 items-center justify-center"
-            style={{ background: dark ? "var(--sq-dark)" : "var(--sq-light)", cursor: interactive ? "pointer" : "default" }}
+            style={{
+              background: dark ? "var(--sq-dark)" : "var(--sq-light)",
+              boxShadow: "inset 0 0 0 0.5px var(--sq-line), inset 0 0 10px var(--sq-glow)",
+              cursor: interactive ? "pointer" : "default",
+            }}
             aria-label={`${FILES[col]}${BOARD_SIZE - row}${piece ? ` ${piece.color === "w" ? "white" : "black"} ${pieceDef(piece.n).label}` : ""}`}
           >
             {highlight && <span className="absolute inset-0" style={{ background: highlight }} />}
@@ -89,14 +94,14 @@ export function Board({
             )}
             {piece && (
               <span
-                className="relative flex aspect-square w-[78%] items-center justify-center rounded-full font-math text-[min(3.4vh,4.2vw)] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.35)] transition-transform"
+                className="relative flex aspect-square w-[78%] items-center justify-center rounded-full font-math text-[min(3.4vh,4.2vw)] font-semibold transition-transform"
                 style={{
                   background: piece.color === "w" ? "var(--piece-w-bg)" : "var(--piece-b-bg)",
                   color: piece.color === "w" ? "var(--piece-w-fg)" : "var(--piece-b-fg)",
                   // Outlined pieces in the Chalkboard and Blueprint looks; transparent in Classic.
                   border: `2px solid ${piece.color === "w" ? "var(--piece-w-ring)" : "var(--piece-b-ring)"}`,
                   textShadow: "var(--piece-glow)",
-                  boxShadow: piece.n === 1 ? "0 0 0 2px var(--accent), 0 3px 6px rgba(0,0,0,.35)" : undefined,
+                  boxShadow: `${piece.n === 1 ? "0 0 0 2px var(--accent), " : ""}var(--piece-${piece.color}-shadow)`,
                   transform: sq === selected ? "scale(1.08)" : undefined,
                 }}
               >

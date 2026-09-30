@@ -17,6 +17,16 @@
   --piece-w-ring: transparent;
   --piece-b-ring: transparent;
   --piece-glow: none;
+  --piece-w-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+  --piece-b-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+  --sq-line: transparent;
+  --sq-glow: transparent;
+  --board-shadow: 0 0 0 4px var(--sq-frame), 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --title-glow: none;
+  --clock-on-bg: var(--fg);
+  --clock-on-fg: var(--bg);
+  --clock-on-border: var(--fg);
+  --clock-on-glow: 0 1px 2px rgba(0, 0, 0, 0.05);
   --bg: #f4f1ea;
   --bg-glow: #ffffff;
   --fg: #1d2129;
@@ -54,6 +64,17 @@
   --piece-w-fg: #151920;
   --piece-b-bg: #0b0d11;
   --piece-b-fg: #f4f1ea;
+}
+
+/* Looks without glow reset the glow variables, so a preview of them inside a Neon page doesn't inherit Neon's. */
+[data-look="chalk"],
+[data-look="blueprint"] {
+  --piece-w-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+  --piece-b-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+  --sq-line: transparent;
+  --sq-glow: transparent;
+  --title-glow: none;
+  --board-shadow: 0 0 0 4px var(--sq-frame), 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- Chalkboard: a green board on a classroom wall (light) or at night (dark) ---- */
@@ -149,6 +170,65 @@
   --piece-b-bg: #8ecae6;
   --piece-b-fg: #0b2545;
   --piece-b-ring: #8ecae6;
+}
+
+/* ---- Neon: a glowing glass board, seen from above (dark); on a pale page (light) ---- */
+[data-look="neon"] {
+  --bg-pattern:
+    radial-gradient(ellipse 60% 45% at 12% 88%, rgba(255, 43, 214, 0.1), transparent 70%),
+    radial-gradient(ellipse 55% 40% at 88% 12%, rgba(0, 229, 255, 0.1), transparent 70%),
+    linear-gradient(rgba(124, 58, 237, 0.07) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(124, 58, 237, 0.07) 1px, transparent 1px) 0 0 / 48px 48px;
+  --display-font: var(--font-orbitron), var(--font-geist-sans), sans-serif;
+  --title-glow: 0 0 6px rgba(255, 43, 214, 0.55);
+  --bg: #eceaf7;
+  --bg-glow: #f8f7fd;
+  --fg: #1a1433;
+  --muted: #564f78;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-border: rgba(26, 20, 51, 0.16);
+  --accent: #c0149f;
+  /* The board itself stays a dark glowing glass sheet in both modes. */
+  --sq-light: #0e1d38;
+  --sq-dark: #081328;
+  --sq-line: rgba(0, 229, 255, 0.62);
+  --sq-glow: rgba(0, 229, 255, 0.14);
+  --sq-frame: #ff2bd6;
+  --board-shadow:
+    0 0 0 3px #ff2bd6,
+    0 0 16px 3px rgba(255, 43, 214, 0.75),
+    0 0 48px 8px rgba(255, 43, 214, 0.35);
+  --hint: rgba(0, 229, 255, 0.6);
+  --select: rgba(0, 229, 255, 0.28);
+  --last: rgba(255, 43, 214, 0.22);
+  --check: rgba(255, 59, 59, 0.55);
+  /* White = hollow cyan glow, Black = filled magenta glass: they differ by fill, not only colour. */
+  --piece-w-bg: rgba(0, 229, 255, 0.1);
+  --piece-w-fg: #d6fbff;
+  --piece-w-ring: #00e5ff;
+  --piece-w-shadow: 0 0 10px rgba(0, 229, 255, 0.75), inset 0 0 10px rgba(0, 229, 255, 0.35);
+  --piece-b-bg: rgba(214, 22, 178, 0.78);
+  --piece-b-fg: #fff2fc;
+  --piece-b-ring: #ff6be6;
+  --piece-b-shadow: 0 0 10px rgba(255, 43, 214, 0.75), inset 0 0 8px rgba(255, 255, 255, 0.25);
+  --piece-glow: 0 0 6px currentColor;
+}
+
+.dark[data-look="neon"],
+.dark [data-look="neon"] {
+  --bg: #05060d;
+  --bg-glow: #120a26;
+  --fg: #e6f7ff;
+  --muted: #9aa8cc;
+  --panel: rgba(10, 12, 28, 0.88);
+  --panel-border: rgba(0, 229, 255, 0.25);
+  --accent: #ff4fdc;
+  --title-glow: 0 0 8px #00e5ff, 0 0 24px rgba(0, 229, 255, 0.6);
+  /* The clock that's ticking glows cyan instead of turning into a white block. */
+  --clock-on-bg: rgba(0, 229, 255, 0.14);
+  --clock-on-fg: #e6f7ff;
+  --clock-on-border: #00e5ff;
+  --clock-on-glow: 0 0 12px rgba(0, 229, 255, 0.6);
 }
 
 @theme inline {

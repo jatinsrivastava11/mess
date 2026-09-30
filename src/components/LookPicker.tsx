@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PieceLabel } from "./PieceLabel";
 
 const LOOKS = [
+  { id: "neon", label: "Neon", blurb: "A glowing glass board, seen from above." },
   { id: "classic", label: "Classic", blurb: "Warm paper and slate." },
   { id: "chalk", label: "Chalkboard", blurb: "Chalk on a green board." },
   { id: "blueprint", label: "Blueprint", blurb: "Ink on graph paper. A blueprint in dark mode." },
@@ -21,6 +22,7 @@ function Preview({ look }: { look: Look }) {
         color: `var(--piece-${color}-fg)`,
         border: `1.5px solid var(--piece-${color}-ring)`,
         textShadow: "var(--piece-glow)",
+        boxShadow: `var(--piece-${color}-shadow)`,
       }}
     >
       <PieceLabel n={n} />
@@ -28,14 +30,17 @@ function Preview({ look }: { look: Look }) {
   );
   return (
     <div data-look={look} className="rounded-lg p-2" style={{ background: "var(--bg-pattern), var(--bg)" }}>
-      <div className="grid grid-cols-4 overflow-hidden rounded ring-2 ring-[var(--sq-frame)]">
+      <div className="grid grid-cols-4 overflow-hidden rounded" style={{ boxShadow: "var(--board-shadow)" }}>
         {Array.from({ length: 16 }, (_, i) => {
           const dark = (Math.floor(i / 4) + i) % 2 === 1;
           return (
             <span
               key={i}
               className="flex aspect-square items-center justify-center"
-              style={{ background: dark ? "var(--sq-dark)" : "var(--sq-light)" }}
+              style={{
+                background: dark ? "var(--sq-dark)" : "var(--sq-light)",
+                boxShadow: "inset 0 0 0 0.5px var(--sq-line), inset 0 0 6px var(--sq-glow)",
+              }}
             >
               {i === 1 && piece("b", 13)}
               {i === 6 && piece("b", 1)}
@@ -45,7 +50,10 @@ function Preview({ look }: { look: Look }) {
           );
         })}
       </div>
-      <p className="mt-1 text-center text-sm font-bold" style={{ fontFamily: "var(--display-font)", color: "var(--fg)" }}>
+      <p
+        className="mt-2 text-center text-sm font-bold"
+        style={{ fontFamily: "var(--display-font)", color: "var(--fg)", textShadow: "var(--title-glow)" }}
+      >
         mess
       </p>
     </div>
@@ -54,20 +62,18 @@ function Preview({ look }: { look: Look }) {
 
 /** Settings → Look. Saved on this device and applied before the page paints on the next visit. */
 export function LookPicker() {
-  const [look, setLook] = useState<Look>(() => (document.documentElement.dataset.look as Look | undefined) ?? "classic");
+  const [look, setLook] = useState<Look>(() => (document.documentElement.dataset.look as Look | undefined) ?? "neon");
 
   function choose(id: Look) {
     setLook(id);
-    const html = document.documentElement;
-    if (id === "classic") html.removeAttribute("data-look");
-    else html.setAttribute("data-look", id);
+    document.documentElement.setAttribute("data-look", id);
     try {
       localStorage.setItem("mess-look", id);
     } catch {}
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Look">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Look">
       {LOOKS.map((l) => (
         <button
           key={l.id}
