@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Account } from "@/lib/account/useAccount";
 import { askBot } from "@/lib/bot/askBot";
 import { makeMove, newGame } from "@/lib/game/engine";
@@ -8,7 +8,7 @@ import { randomSeed } from "@/lib/game/rng";
 import { Board } from "./Board";
 import { PieceLabel } from "./PieceLabel";
 
-/** The home headline: 15 lines that take turns every 5 seconds. The first four are the originals. */
+/** The home headline: 13 lines, a new one every 10 seconds in shuffled order. The first four are the originals. */
 export const TAGLINES = [
   "who made this mess of chess?",
   "chess, but sooo messy",
@@ -19,18 +19,35 @@ export const TAGLINES = [
   "keep calm and square root",
   "don't be a square, be a root.",
   "Pythagoras would be proud.",
-  "most of these pieces are irrational",
-  "√(math × chess) = mess",
   "calculate first, checkmate later",
   "clean up this mess, one root at a time",
   "your move, mathematician.",
   "every piece is a root. good luck.",
 ];
 
+/** All line numbers in random order (Fisher–Yates), never starting with `avoid` so a line can't show twice in a row. */
+function shuffledDeck(avoid: number): number[] {
+  const deck = TAGLINES.map((_, i) => i);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  if (deck[0] === avoid) [deck[0], deck[deck.length - 1]] = [deck[deck.length - 1], deck[0]];
+  return deck;
+}
+
 function RotatingTagline() {
+  // Always opens on the first line (so the server and browser agree), then deals from a shuffled deck:
+  // every line once in random order, then reshuffle, so it never feels like a fixed loop.
   const [i, setI] = useState(0);
+  const current = useRef(0);
+  const deck = useRef<number[]>([]);
   useEffect(() => {
-    const id = setInterval(() => setI((n) => (n + 1) % TAGLINES.length), 5000);
+    const id = setInterval(() => {
+      if (deck.current.length === 0) deck.current = shuffledDeck(current.current);
+      current.current = deck.current.shift()!;
+      setI(current.current);
+    }, 10_000);
     return () => clearInterval(id);
   }, []);
   return (
