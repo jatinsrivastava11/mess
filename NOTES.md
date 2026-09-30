@@ -59,6 +59,8 @@ A jump (dx, dy) changes square colour only when dx + dy is odd. So √8 (2 strai
 - **Effects:** `useEffect` runs the timer and cleans up with `clearInterval`. Don't use effects for things you can compute during render (the linter caught one of these).
 - **Lifting state up:** `Board` doesn't own the game. It calls `onMove` and the parent updates the state.
 - **Controlled inputs:** the join-code box.
+- **Pointer events for drag and drop (`Board.tsx`):** one API covers mouse, pen and touch. A press only becomes a drag after moving 6 px, so taps still work. `setPointerCapture` keeps the drag alive when the pointer leaves the square, and `touch-action: none` stops the page scrolling under your finger. The square under the pointer comes from maths on the board's rectangle, not from hit-testing elements.
+- **Helpful errors without spoilers (`explain.ts`):** the message is computed only from the square you tried, never from the legal-move list. Writing its tests revealed a fact about mess: every piece jumps, so **pins are impossible**. Moving one piece can never expose your king.
 - Learn: [react.dev/learn](https://react.dev/learn), especially "Thinking in React" and "You Might Not Need an Effect".
 
 ---

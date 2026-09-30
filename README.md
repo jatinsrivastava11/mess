@@ -51,6 +51,9 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [x] Chess clock for each player (3, 5 or 10 minutes, picked when creating a game). Running out of time loses.
 - [x] Big centred board, rules (i) popup, light/dark toggle
 - [x] **No move hints** after your first game ever (it opens with a notice explaining this); **Tutorial** games vs the bot bring the dots back. Illegal tries get a message.
+- [x] **Home screen:** a live board where two bots play each other, the play panel (vs Bot, Create, Join), your wins, and how pieces move
+- [x] **Drag and drop** pieces (mouse or touch), or tap a piece then a square
+- [x] **"Can't move there" explanations** beside the board for 3 seconds. They show the maths of the square you tried (e.g. 3² + 1² = 10, but this piece is √32) and never where the piece *can* go
 - [x] **Move review:** ← → (or ◀ ▶) step through earlier positions without changing the game; Home/End jump to the start/live position
 - [x] **Resign** with the flag next to your clock (two taps to confirm)
 - [x] **Four looks** (Settings): **Neon** (the default: a glowing glass board seen from above), Classic, Chalkboard and Blueprint, each with light and dark. All pass WCAG AA contrast (4.5:1 or better), and the two sides differ by fill as well as colour for colourblind players.
@@ -109,11 +112,12 @@ src/
   app/                 Next.js entry: layout, page, global styles/theme
     api/games/         server routes: create / join / move / resign / flag
     api/account/       server route: check / claim a username
-  components/          UI: Board, PieceLabel, Rules, Modal, Logo, Controls, AccountPanels, LookPicker, MessApp (the shell)
+  components/          UI: HomeScreen, Board (tap + drag), PieceLabel, Rules, Modal, Logo, Controls, AccountPanels, LookPicker, MessApp (the shell)
   lib/game/
     pieces.ts          which pieces exist and how they move
     engine.ts          rules: setup, legal moves, check/mate/stalemate/draws
     clock.ts           chess clock (pure functions, tested)
+    explain.ts         why a move is illegal, without revealing legal moves (tested)
     rng.ts             seeded random numbers
   lib/online/
     game-doc.ts        an online game as stored, and the server-side rules for changing it

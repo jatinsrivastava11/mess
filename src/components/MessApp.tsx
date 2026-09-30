@@ -13,6 +13,7 @@ import {
   rootSum,
   timeout,
 } from "@/lib/game/engine";
+import { explainIllegal } from "@/lib/game/explain";
 import { randomSeed } from "@/lib/game/rng";
 import { askBot } from "@/lib/bot/askBot";
 import { LEVELS, type Level } from "@/lib/bot/search";
@@ -21,6 +22,7 @@ import { onlineAvailable } from "@/lib/firebase/client";
 import { CODE_LENGTH, CODE_PATTERN, replay } from "@/lib/online/game-doc";
 import { useOnlineGame } from "@/lib/online/useOnlineGame";
 import { AccountPanel, ProfilePanel } from "./AccountPanels";
+import { HomeScreen } from "./HomeScreen";
 import { Board } from "./Board";
 import { ClockFace, IconButton, ResignFlag, ThemeToggle, colorName } from "./Controls";
 import { LookPicker } from "./LookPicker";
@@ -135,7 +137,7 @@ export function MessApp() {
 
   useEffect(() => {
     if (!notice) return;
-    const id = setTimeout(() => setNotice(""), 2500);
+    const id = setTimeout(() => setNotice(""), 3000);
     return () => clearTimeout(id);
   }, [notice]);
 
@@ -277,7 +279,7 @@ export function MessApp() {
   const flipped = myColor === "b";
   const [topColor, bottomColor]: Color[] = flipped ? ["w", "b"] : ["b", "w"];
   // The home popup blurs the page, but its corner buttons (account, rules, theme…) must stay usable.
-  const cornerLayer = !playing && popup === null ? "z-50" : "z-10";
+  const cornerLayer = "z-10";
   const interactive =
     playing && !over && !waiting && (isOnline ? game.turn === myColor && !pendingActive : !botToMove);
 
@@ -311,7 +313,11 @@ export function MessApp() {
       <header className="spotlight pointer-events-none absolute inset-x-0 top-0 flex h-28 justify-center pt-3">
         <div className="flex h-9 items-center gap-2 sm:h-10">
           <Logo className="h-6 w-6 sm:h-8 sm:w-8" />
-          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl" style={{ textShadow: "var(--title-glow)" }}>
+          {/* On narrow phones the home headline already says it, and the corner icons need the room. */}
+          <h1
+            className={`font-display text-2xl font-bold tracking-tight sm:text-3xl ${playing ? "" : "max-[420px]:hidden"}`}
+            style={{ textShadow: "var(--title-glow)" }}
+          >
             mess
           </h1>
         </div>
@@ -353,7 +359,8 @@ export function MessApp() {
         </IconButton>
       </div>
 
-      {/* Centre: the board, with each clock next to its own side on phones */}
+      {/* Centre: the board during a game (each clock next to its own side on phones) */}
+      {playing && (
       <div className="mt-10 flex flex-col items-center gap-3">
         {playing && clock && (
           <div className="self-start sm:hidden">{clockWithFlag(topColor, clock)}</div>
@@ -364,15 +371,13 @@ export function MessApp() {
           interactive={interactive && !reviewing}
           flipped={flipped}
           showHints={hints}
-          onIllegal={(from) => {
-            const n = game.board[from]?.n;
-            setNotice(n ? `${n === 1 ? "The king" : `√${n}`} can't move there.` : "That move isn't allowed.");
-          }}
+          onIllegal={(from, to) => setNotice(explainIllegal(game, from, to) || "That move isn't allowed.")}
         />
         {playing && clock && (
           <div className="self-end sm:hidden">{clockWithFlag(bottomColor, clock)}</div>
         )}
       </div>
+      )}
 
       {/* Bottom centre: move review controls and whose turn it is */}
       {playing && !waiting && (
@@ -448,12 +453,15 @@ export function MessApp() {
         <ThemeToggle />
       </div>
 
+      {/* Why a move didn't work: beside the board for 3 seconds (above the move bar on phones). */}
       {notice && (
         <div
+          key={notice}
           role="status"
-          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-fg px-4 py-2 text-sm text-bg shadow-lg"
+          className="animate-pop-in fixed inset-x-4 bottom-20 z-30 rounded-xl border border-panel-border bg-panel px-4 py-3 text-sm shadow-lg backdrop-blur sm:inset-x-auto sm:top-1/2 sm:right-6 sm:bottom-auto sm:w-64 sm:-translate-y-1/2"
         >
-          {notice}
+          <p className="mb-1 text-xs font-semibold tracking-wide text-accent uppercase">Can&apos;t move there</p>
+          <p>{notice}</p>
         </div>
       )}
 
@@ -466,21 +474,27 @@ export function MessApp() {
         </div>
       )}
 
-      {!playing && popup === null && (
-        <Modal>
+      {!playing && (
+        <HomeScreen
+          account={account}
+          onRules={() => setPopup("info")}
+          onProfile={() => setPopup("profile")}
+          onAccount={() => setPopup("account")}
+          panel={
+            <>
           {home === "choose" && (
-            <div className="space-y-3 text-center">
-              <div className="mb-5 flex flex-col items-center gap-2">
-                <Logo className="h-12 w-12" />
-                <p className="text-sm text-muted">Chess where every piece is a square root.</p>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-wide text-accent uppercase">Play</p>
+              <Button onClick={() => setHome("bot")}>Play vs Bot</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="ghost" onClick={() => setHome("create")}>
+                  Create Game
+                </Button>
+                <Button variant="ghost" onClick={() => setHome("join")}>
+                  Join Game
+                </Button>
               </div>
-              <Button onClick={() => setHome("create")}>Create Game</Button>
-              <Button variant="ghost" onClick={() => setHome("join")}>
-                Join Game
-              </Button>
-              <Button variant="ghost" onClick={() => setHome("bot")}>
-                Play vs Bot
-              </Button>
+              <p className="text-center text-xs text-muted">Create a game and send the code to a friend, on any device.</p>
             </div>
           )}
           {home === "bot" && (
@@ -612,7 +626,9 @@ export function MessApp() {
               </button>
             </form>
           )}
-        </Modal>
+            </>
+          }
+        />
       )}
 
       {waiting && popup === null && (
