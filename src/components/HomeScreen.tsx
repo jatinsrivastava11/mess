@@ -8,6 +8,46 @@ import { randomSeed } from "@/lib/game/rng";
 import { Board } from "./Board";
 import { PieceLabel } from "./PieceLabel";
 
+/** The home headline: 15 lines that take turns every 5 seconds. The first four are the originals. */
+export const TAGLINES = [
+  "who made this mess of chess?",
+  "chess, but sooo messy",
+  "no one mess with chess!",
+  "mess means math and chess, get it :)",
+  "a² + b² = checkmate",
+  "knight? no, it's √5.",
+  "keep calm and square root",
+  "don't be a square, be a root.",
+  "Pythagoras would be proud.",
+  "most of these pieces are irrational",
+  "√(math × chess) = mess",
+  "calculate first, checkmate later",
+  "clean up this mess, one root at a time",
+  "your move, mathematician.",
+  "every piece is a root. good luck.",
+];
+
+function RotatingTagline() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => (n + 1) % TAGLINES.length), 5000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    // Fixed height (3 lines on phones, 2 wider) so the buttons below don't jump as lines change length.
+    // aria-live="off": screen readers shouldn't announce every change.
+    <h2
+      aria-live="off"
+      className="flex min-h-[3.75em] items-center justify-center font-display text-3xl leading-tight font-bold sm:min-h-[2.5em] sm:text-4xl lg:justify-start"
+      style={{ textShadow: "var(--title-glow)" }}
+    >
+      <span key={i} className="animate-fade-in">
+        {TAGLINES[i]}
+      </span>
+    </h2>
+  );
+}
+
 /** Two Medium bots playing each other, so visitors see a real game straight away. */
 function DemoBoard() {
   const [game, setGame] = useState(() => newGame(7));
@@ -66,9 +106,7 @@ export function HomeScreen({
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 lg:min-h-full lg:flex-row lg:justify-center lg:gap-14">
         <div className="w-full max-w-md space-y-4">
           <div className="space-y-1 text-center lg:text-left">
-            <h2 className="font-display text-3xl leading-tight font-bold sm:text-4xl" style={{ textShadow: "var(--title-glow)" }}>
-              Chess, but every piece is a square root.
-            </h2>
+            <RotatingTagline />
             <p className="text-muted">
               √n jumps along a right triangle whose hypotenuse is √n. Work out the maths, then outplay your opponent.
             </p>
