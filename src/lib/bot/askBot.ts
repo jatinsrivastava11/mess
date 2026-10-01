@@ -19,8 +19,11 @@ function getWorker(): Worker | null {
   return worker;
 }
 
-/** Asks the bot for its move. Resolves after at least `minMs`, so instant replies don't feel robotic. */
-export async function askBot(game: GameState, level: Level, minMs = 450): Promise<Move> {
+/**
+ * Asks the bot for its move. Resolves after at least `minMs`, so instant replies don't feel robotic.
+ * `searchMs` limits how long Hard searches (it shrinks when the bot's clock is low).
+ */
+export async function askBot(game: GameState, level: Level, minMs = 450, searchMs?: number): Promise<Move> {
   const started = Date.now();
   const w = getWorker();
   let move: Move;
@@ -28,11 +31,11 @@ export async function askBot(game: GameState, level: Level, minMs = 450): Promis
     const id = nextId++;
     move = await new Promise<Move>((resolve) => {
       waiting.set(id, resolve);
-      w.postMessage({ id, game, level });
+      w.postMessage({ id, game, level, searchMs });
     });
   } else {
     const { chooseMove } = await import("./search"); // no worker support: think on the main thread
-    move = chooseMove(game, level);
+    move = chooseMove(game, level, Math.random, undefined, searchMs);
   }
   const left = minMs - (Date.now() - started);
   if (left > 0) await new Promise((r) => setTimeout(r, left));

@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type Clock, TIME_CONTROLS_MIN, type TimeControl, flagged, pressClock, startClock, stopClock } from "@/lib/game/clock";
+import {
+  type Clock,
+  TIME_CONTROLS_MIN,
+  type TimeControl,
+  flagged,
+  pressClock,
+  startClock,
+  stopClock,
+  timeLeft,
+} from "@/lib/game/clock";
 import {
   type Color,
   type GameState,
@@ -16,6 +25,8 @@ import {
 import { explainIllegal } from "@/lib/game/explain";
 import { randomSeed } from "@/lib/game/rng";
 import { askBot } from "@/lib/bot/askBot";
+import { fromBoard, legalMoves } from "@/lib/bot/board";
+import { thinkTime } from "@/lib/bot/thinkTime";
 import { LEVELS, type Level } from "@/lib/bot/search";
 import { useAccount } from "@/lib/account/useAccount";
 import { onlineAvailable } from "@/lib/firebase/client";
@@ -199,7 +210,13 @@ export function MessApp() {
     if (!botToMove || !local?.bot) return;
     const asked = local.game;
     let cancelled = false;
-    askBot(asked, local.bot.level).then((m) => {
+    // Think like a person: a pause that depends on the level, quicker for forced moves or when low on time.
+    const { totalMs, searchMs } = thinkTime(
+      local.bot.level,
+      legalMoves(fromBoard(asked.board, asked.turn)).length,
+      timeLeft(local.clock, local.bot.color, Date.now()),
+    );
+    askBot(asked, local.bot.level, totalMs, searchMs).then((m) => {
       if (cancelled || !m) return;
       const t = Date.now();
       setLocal((g) => {
@@ -212,7 +229,7 @@ export function MessApp() {
     return () => {
       cancelled = true;
     };
-  }, [botToMove, local?.game, local?.bot]);
+  }, [botToMove, local?.game, local?.bot, local?.clock]);
 
   function move(from: number, to: number) {
     if (isOnline && confirmed) {

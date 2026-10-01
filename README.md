@@ -65,7 +65,7 @@ A piece is only allowed if it has at least one move from **every** square of the
 - [ ] Elo rating
 - [ ] Bot protection (App Check / reCAPTCHA) once the site has its public address
 - [ ] Settings
-- [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. Its piece values were learned by self-play (the trained bot beats the untrained one 58% of the time), and it knows the maths-points rule. Level check: a beginner who just grabs free pieces beats Easy more often than not; Medium beats Easy 99%; Hard beats Medium 75%.
+- [x] **Play vs Bot:** Easy, Medium and Hard. The bot runs in your browser, so it's free and works offline. It takes human-like thinking time (Easy 1–2.5 s, Medium 1.5–3.5 s, Hard 2–4.5 s; quicker for forced moves, and never more than 5% of its remaining clock). Its piece values were learned by self-play (the trained bot beats the untrained one 58% of the time), and it knows the maths-points rule. Level check: a beginner who just grabs free pieces beats Easy more often than not; Medium beats Easy 99%; Hard beats Medium 75%.
 
 Guests play with an invisible identity. Creating an account upgrades that same identity, so a game in progress isn't lost.
 

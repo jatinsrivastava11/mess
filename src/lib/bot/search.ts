@@ -200,13 +200,15 @@ export function chooseMove(
   level: Level,
   rand: () => number = Math.random,
   tables: Tables = DEFAULT_TABLES,
+  /** How long Hard may search (ms). Less when its clock is low. */
+  searchMs = 1500,
 ): { from: number; to: number } | null {
   const pos = fromBoard(game.board, game.turn);
   const moves = legalMoves(pos);
   if (moves.length === 0) return null;
   const pick = (m: number) => ({ from: moveFrom(m), to: moveTo(m) });
 
-  if (level === "hard") return pick(bestMove(pos, tables, { timeMs: 1500, quiet: game.quietMoves }).move);
+  if (level === "hard") return pick(bestMove(pos, tables, { timeMs: searchMs, quiet: game.quietMoves }).move);
 
   if (level === "easy") {
     // Tuned so a beginner who just grabs free pieces beats it more often than not:
