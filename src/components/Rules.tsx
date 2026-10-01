@@ -46,8 +46,8 @@ export function Rules() {
         <h3 className="mb-1 font-semibold">Rules</h3>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            8×8 board. Each player fills their back two rows with their king (on the back row) and 15 random pieces. The two
-            sides are drawn separately.
+            8×8 board. Each player fills their back two rows with their king (on the back row) and 14 random pieces, leaving
+            the square in front of the king empty so it has room to move. The two sides are drawn separately.
           </li>
           <li>White moves first. All pieces <b>jump</b>, so pieces in between never block them.</li>
           <li>Land on an enemy piece to capture it. You can&apos;t land on your own pieces.</li>

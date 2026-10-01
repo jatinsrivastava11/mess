@@ -7,7 +7,7 @@
 ## How it plays
 
 - **Board:** a standard 8×8 board.
-- **Setup:** each player fills their back two rows: the king (on the back row) and **15 random pieces**. The two sides are drawn *independently*, so no two games (or armies) are alike.
+- **Setup:** each player fills their back two rows: the king (on the back row) and **14 random pieces**, with the square in front of the king left empty. The two sides are drawn *independently*, so no two games (or armies) are alike.
 - **Movement:** a piece √n is the hypotenuse of a right triangle with whole-number sides a, b ≥ 1 (a² + b² = n). It **jumps** like a knight: a squares one way, b the other. Pieces in between never block it.
 - **Equal sides move straight:** when a = b (√2, √8, √18, √32), the piece jumps a squares in a straight line (up, down, left or right). √2 steps 1, √8 jumps 2, and so on.
 - If n can be split into two squares in more than one way, the piece gets every split. This only happens on bigger boards: √50 = 1² + 7² = 5² + 5².
@@ -19,7 +19,7 @@
 - **Clock:** each player has their own clock (3, 5 or 10 minutes). Only the player to move loses time. If your clock hits zero, you lose.
 - **Draws:** stalemate (no legal move but not in check), only the two kings left, or exactly equal maths points.
 
-**Why these rules?** With the first version (8 pieces each, a draw after 50 quiet moves), bot-vs-bot tests showed 97% of games were draws: jumping pieces make it easy to dodge forever. Testing alternatives showed 16 pieces gives real checkmates in about half of games, and maths points settles the rest: now about 62% end in checkmate and under 3% are drawn.
+**Why these rules?** With the first version (8 pieces each, a draw after 50 quiet moves), bot-vs-bot tests showed 97% of games were draws: jumping pieces make it easy to dodge forever. Testing alternatives showed 16 pieces plus maths points gives a winner in about 97% of games. Then a test found that kings boxed in by their own pieces could be checkmated on move 1 in about a third of setups, so the square in front of each king now starts empty. White can never mate on move 1 any more, and games are still about 97% decisive (roughly 30% by checkmate, the rest on maths points).
 
 ## The pieces
 

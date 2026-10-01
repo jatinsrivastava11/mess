@@ -56,20 +56,33 @@ describe("piece pool", () => {
 });
 
 describe("board generation", () => {
-  it("is deterministic per seed and gives each side one king plus 15 pieces on its back two rows", () => {
+  it("is deterministic per seed and gives each side one king plus 14 pieces on its back two rows", () => {
     const a = generateBoard(42);
     expect(generateBoard(42)).toEqual(a);
     for (const color of ["w", "b"] as const) {
       const mine = a.filter((p) => p?.color === color);
-      expect(mine).toHaveLength(16);
+      expect(mine).toHaveLength(15);
       expect(mine.filter((p) => p!.n === KING)).toHaveLength(1);
     }
-    expect(a.slice(0, 16).every((p) => p?.color === "b")).toBe(true);
-    expect(a.slice(48, 64).every((p) => p?.color === "w")).toBe(true);
+    expect(a.slice(0, 16).filter((p) => p?.color === "b")).toHaveLength(15);
+    expect(a.slice(48, 64).filter((p) => p?.color === "w")).toHaveLength(15);
     expect(a.slice(16, 48).every((p) => p === null)).toBe(true);
-    // Kings start on the very back row.
-    expect(a.findIndex((p) => p?.n === KING && p.color === "b")).toBeLessThan(8);
-    expect(a.findIndex((p) => p?.n === KING && p.color === "w")).toBeGreaterThanOrEqual(56);
+    // Kings start on the very back row, with the square in front of them empty.
+    const bk = a.findIndex((p) => p?.n === KING && p.color === "b");
+    const wk = a.findIndex((p) => p?.n === KING && p.color === "w");
+    expect(bk).toBeLessThan(8);
+    expect(wk).toBeGreaterThanOrEqual(56);
+    expect(a[bk + 8]).toBeNull();
+    expect(a[wk - 8]).toBeNull();
+  });
+
+  it("never lets White checkmate on the very first move", () => {
+    const moves = (g: GameState) => g.board.flatMap((_, f) => legalTargets(g, f).map((t) => [f, t] as const));
+    // 40 setups keeps the suite fast; a 300-setup measurement found 0 first-move mates.
+    for (let seed = 0; seed < 40; seed++) {
+      const g = newGame(seed);
+      expect(moves(g).some(([f, t]) => makeMove(g, f, t).status.kind === "checkmate")).toBe(false);
+    }
   });
 
   it("never starts in check", () => {

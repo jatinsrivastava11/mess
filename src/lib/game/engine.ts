@@ -49,7 +49,7 @@ export interface GameState {
  */
 export const QUIET_MOVE_LIMIT = 100;
 
-/** Rows each side starts with: the king plus 15 pieces on the back two rows. */
+/** Rows each side starts with: the back two rows, holding the king plus 14 pieces. */
 export const ROWS_PER_SIDE = 2;
 
 export const other = (c: Color): Color => (c === "w" ? "b" : "w");
@@ -61,8 +61,12 @@ const onBoard = (row: number, col: number) =>
 
 /**
  * Random starting position: each side fills its back two rows with a king (on a
- * random square of the very back row) and 15 pieces drawn from the pool
+ * random square of the very back row) and 14 pieces drawn from the pool
  * (repeats allowed). The two sides are drawn independently, so they usually differ.
+ *
+ * The square in front of each king starts empty. With the king fully boxed in by
+ * its own pieces, any uncapturable check was instant mate: White could mate on
+ * move 1 in about a third of setups. The gap gives the king a way out.
  */
 export function generateBoard(seed: number): Board {
   const rand = mulberry32(seed);
@@ -71,6 +75,7 @@ export function generateBoard(seed: number): Board {
     const kingCol = Math.floor(rand() * BOARD_SIZE);
     for (let r = 0; r < ROWS_PER_SIDE; r++) {
       for (let col = 0; col < BOARD_SIZE; col++) {
+        if (r === 1 && col === kingCol) continue; // the king's breathing room
         const n = r === 0 && col === kingCol ? KING : POOL[Math.floor(rand() * POOL.length)].n;
         board[sqAt(back + forward * r, col)] = { n, color };
       }
